@@ -13,7 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useSocialStore } from '../store/useSocialStore';
 import { getMapStatus, setMapStatusMessage, setProximityState } from '../api/client';
-import { UserProfileSheet, type ViewableUser } from '../components/UserProfileSheet';
+import type { ViewableUser } from '../components/UserProfileSheet';
 import { useQuizStore, MOCK_COMPATIBILITY_ANSWERS } from '../store/useQuizStore';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -191,12 +191,12 @@ function UserSheet({ user, onClose, onViewProfile, compatibility, statusMessage 
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export function MapScreen() {
+  const nav = useNavigation<Nav>();
   const social = useSocialStore();
   const mapRef = useRef<MapView>(null);
   const [myLocation, setMyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<MockUser | null>(null);
-  const [profileUser, setProfileUser] = useState<ViewableUser | null>(null);
   const [visibleUsers, setVisibleUsers] = useState<MockUser[]>(MOCK_USERS);
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -457,23 +457,24 @@ export function MapScreen() {
           statusMessage={selectedUser.mapStatusMessage}
           onClose={() => setSelectedUser(null)}
           onViewProfile={() => {
-            const quiz = computedCompatibility(selectedUser.id);
-            setProfileUser({
-              id: selectedUser.id,
-              displayName: selectedUser.displayName,
-              avatarInitials: selectedUser.avatarInitials,
-              avatarColor: selectedUser.avatarColor,
-              age: selectedUser.age,
-              hobbies: selectedUser.hobbies,
-              compatibility: quiz ?? selectedUser.compatibility,
-              posts: selectedUser.posts,
-            });
+            const u = selectedUser;
+            if (!u) return;
+            const quiz = computedCompatibility(u.id);
+            const payload: ViewableUser = {
+              id: u.id,
+              displayName: u.displayName,
+              avatarInitials: u.avatarInitials,
+              avatarColor: u.avatarColor,
+              age: u.age,
+              hobbies: u.hobbies,
+              compatibility: quiz ?? u.compatibility,
+              posts: u.posts,
+            };
+            setSelectedUser(null);
+            setTimeout(() => nav.navigate('UserProfile', { userJson: JSON.stringify(payload) }), 50);
           }}
         />
       )}
-
-      {/* Full profile sheet */}
-      <UserProfileSheet user={profileUser} onClose={() => setProfileUser(null)} />
     </View>
   );
 }
