@@ -10,6 +10,7 @@ export interface MockUser extends NearbyUser {
   age: number;
   hobbies: string[];
   posts: string[]; // preview image URIs (up to 3)
+  mapStatusMessage?: string; // optional short message shown on map
 }
 
 const palette = ['#5B6EF5', '#1DC8A8', '#F05A7E', '#F5A623', '#A78BFA', '#34C97A', '#F97316', '#06B6D4', '#E879F9', '#84CC16'];
@@ -28,12 +29,12 @@ const seeds = [
 ];
 
 export const MOCK_USERS: MockUser[] = [
-  { id: 'mock1',  displayName: 'Арья К.',    wantsToChat: true, latitude: BASE_LAT + offset(40), longitude: BASE_LON + offset(55), compatibility: 5,   avatarInitials: 'АК', avatarColor: palette[0], age: 24, hobbies: ['Фотография', 'Музыка', 'Йога'],        posts: seeds[0].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
+  { id: 'mock1',  displayName: 'Арья К.',    wantsToChat: true, latitude: BASE_LAT + offset(40), longitude: BASE_LON + offset(55), compatibility: 5,   avatarInitials: 'АК', avatarColor: palette[0], age: 24, hobbies: ['Фотография', 'Музыка', 'Йога'],        posts: seeds[0].map(s=>`https://picsum.photos/seed/${s}/200/200`), mapStatusMessage: 'Ищу кого-нибудь поговорить у фонтана 🎵' },
   { id: 'mock2',  displayName: 'Дариус Э.',  wantsToChat: true, latitude: BASE_LAT + offset(70), longitude: BASE_LON + offset(30), compatibility: 4,   avatarInitials: 'ДЭ', avatarColor: palette[1], age: 28, hobbies: ['Кино', 'Программирование'],          posts: seeds[1].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
-  { id: 'mock3',  displayName: 'Лейла М.',   wantsToChat: true, latitude: BASE_LAT + offset(20), longitude: BASE_LON + offset(80), compatibility: 4.5, avatarInitials: 'ЛМ', avatarColor: palette[2], age: 22, hobbies: ['Танцы', 'Путешествия'],             posts: seeds[2].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
+  { id: 'mock3',  displayName: 'Лейла М.',   wantsToChat: true, latitude: BASE_LAT + offset(20), longitude: BASE_LON + offset(80), compatibility: 4.5, avatarInitials: 'ЛМ', avatarColor: palette[2], age: 22, hobbies: ['Танцы', 'Путешествия'],             posts: seeds[2].map(s=>`https://picsum.photos/seed/${s}/200/200`), mapStatusMessage: 'Здесь на 30 минут, пишите! ☕' },
   { id: 'mock4',  displayName: 'Нилуфар Р.', wantsToChat: true, latitude: BASE_LAT + offset(90), longitude: BASE_LON + offset(15), compatibility: 3,   avatarInitials: 'НР', avatarColor: palette[3], age: 26, hobbies: ['Кулинария', 'Чтение'],             posts: seeds[3].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
   { id: 'mock5',  displayName: 'Камаль Б.',  wantsToChat: true, latitude: BASE_LAT + offset(60), longitude: BASE_LON + offset(65), compatibility: 2.5, avatarInitials: 'КБ', avatarColor: palette[4], age: 31, hobbies: ['Спорт', 'Автомобили'],              posts: seeds[4].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
-  { id: 'mock6',  displayName: 'Сабина Г.',  wantsToChat: true, latitude: BASE_LAT + offset(35), longitude: BASE_LON + offset(42), compatibility: 5,   avatarInitials: 'СГ', avatarColor: palette[5], age: 23, hobbies: ['Арт', 'Кафе', 'Музыка'],           posts: seeds[5].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
+  { id: 'mock6',  displayName: 'Сабина Г.',  wantsToChat: true, latitude: BASE_LAT + offset(35), longitude: BASE_LON + offset(42), compatibility: 5,   avatarInitials: 'СГ', avatarColor: palette[5], age: 23, hobbies: ['Арт', 'Кафе', 'Музыка'],           posts: seeds[5].map(s=>`https://picsum.photos/seed/${s}/200/200`), mapStatusMessage: 'Сижу в кафе напротив, буду рада новым знакомствам 😊' },
   { id: 'mock7',  displayName: 'Тимур Ф.',   wantsToChat: true, latitude: BASE_LAT + offset(85), longitude: BASE_LON + offset(50), compatibility: 3.5, avatarInitials: 'ТФ', avatarColor: palette[6], age: 29, hobbies: ['Гейминг', 'Фитнес'],               posts: seeds[6].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
   { id: 'mock8',  displayName: 'Хамида Ю.',  wantsToChat: true, latitude: BASE_LAT + offset(15), longitude: BASE_LON + offset(70), compatibility: 4,   avatarInitials: 'ХЮ', avatarColor: palette[7], age: 25, hobbies: ['Книги', 'Медитация'],              posts: seeds[7].map(s=>`https://picsum.photos/seed/${s}/200/200`) },
   { id: 'mock9',  displayName: 'Омар Д.',    wantsToChat: true, latitude: BASE_LAT + offset(50), longitude: BASE_LON + offset(90), compatibility: 2,   avatarInitials: 'ОД', avatarColor: palette[8], age: 33, hobbies: ['Музыка', 'Путешествия'],           posts: seeds[8].map(s=>`https://picsum.photos/seed/${s}/200/200`) },

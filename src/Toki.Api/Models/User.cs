@@ -26,4 +26,10 @@ public sealed class User
 
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? LastSeenUtc { get; set; }
+
+    /// <summary>Expo push token — registered by the mobile app on login.</summary>
+    public string? ExpoPushToken { get; set; }
+
+    /// <summary>Unix timestamp of spam block expiry; null or in past = not blocked.</summary>
+    public DateTime? SpamBlockedUntilUtc { get; set; }
 }

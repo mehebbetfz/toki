@@ -13,6 +13,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { API_BASE_URL } from './src/config';
 import { QuizModal } from './src/components/QuizModal';
 import { useQuizStore } from './src/store/useQuizStore';
+import { registerForPushNotificationsAsync, setupNotificationResponseHandler } from './src/services/pushNotifications';
 
 function decodeJwtPayload(token: string): { sub: string; email: string } | null {
   try {
@@ -54,6 +55,22 @@ export default function App() {
       }
     })();
   }, [setAuth]);
+
+  // ── Push notifications ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    registerForPushNotificationsAsync().catch(() => {});
+    const cleanup = setupNotificationResponseHandler(
+      (conversationId, senderUserId) => {
+        // Navigation to chat handled by notification tap — nav ref would be needed for deep link
+        console.log('[Push] Navigate to chat:', conversationId);
+      },
+      (userId) => {
+        console.log('[Push] Nearby user:', userId);
+      },
+    );
+    return cleanup;
+  }, [isLoggedIn]);
 
   // ── Quiz timer: check every 30 seconds if it's time to show ────────────────
   useEffect(() => {

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Animated, Dimensions, Easing, Image,
-  Pressable, StyleSheet, Text, TouchableOpacity, View,
+  ActivityIndicator, Alert, Animated, Dimensions, Easing, Image,
+  Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import MapView, { Marker, Circle, Region, PROVIDER_DEFAULT } from 'react-native-maps';
 import * as Location from 'expo-location';
@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useSocialStore } from '../store/useSocialStore';
-import { setWantsToChat } from '../api/client';
+import { authFetch, setWantsToChat } from '../api/client';
 import { UserProfileSheet, type ViewableUser } from '../components/UserProfileSheet';
 import { useQuizStore, MOCK_COMPATIBILITY_ANSWERS } from '../store/useQuizStore';
 
@@ -64,7 +64,7 @@ function UserMarker({ user, isFollowing, compatibility, onPress }: {
 }
 
 // ─── Animated bottom sheet ────────────────────────────────────────────────────
-function UserSheet({ user, onClose, onViewProfile, compatibility }: { user: MockUser; onClose: () => void; onViewProfile: () => void; compatibility: number }) {
+function UserSheet({ user, onClose, onViewProfile, compatibility, statusMessage }: { user: MockUser; onClose: () => void; onViewProfile: () => void; compatibility: number; statusMessage?: string }) {
   const nav = useNavigation<Nav>();
   const social = useSocialStore();
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
@@ -120,6 +120,16 @@ function UserSheet({ user, onClose, onViewProfile, compatibility }: { user: Mock
             <Text style={m.sheetCompat}>{(compatibility * 20).toFixed(0)}% совместимость</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Status message from this user */}
+        {statusMessage ? (
+          <View style={m.statusMsgBubble}>
+            <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+              <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
+            </Svg>
+            <Text style={m.statusMsgBubbleTxt}>{statusMessage}</Text>
+          </View>
+        ) : null}
 
         {/* Hobbies */}
         <View style={m.hobbiesRow}>
@@ -238,6 +248,24 @@ export function MapScreen() {
     mapRef.current?.animateToRegion({ ...myLocation, latitudeDelta: MIN_DELTA * 5, longitudeDelta: MIN_DELTA * 5 }, 500);
   }, [myLocation, getLocation]);
 
+  // ── My map status message ──────────────────────────────────────────────────
+  const [myStatusMsg, setMyStatusMsg] = useState('');
+  const [editingStatus, setEditingStatus] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
+
+  const saveStatusMessage = useCallback(async (msg: string) => {
+    setSavingStatus(true);
+    try {
+      await authFetch('/api/devices/map-status', {
+        method: 'PUT',
+        body: JSON.stringify({ message: msg }),
+      });
+      setMyStatusMsg(msg);
+    } catch { Alert.alert('Ошибка', 'Не удалось сохранить'); }
+    setSavingStatus(false);
+    setEditingStatus(false);
+  }, []);
+
   return (
     <View style={m.container}>
       <MapView
@@ -272,6 +300,22 @@ export function MapScreen() {
         </View>
       </View>
 
+      {/* ── Location gate: blurred overlay when not active ─────────────────── */}
+      {!isActive && (
+        <View style={m.locationGate} pointerEvents="box-none">
+          <View style={m.gateCard}>
+            <Svg width={44} height={44} viewBox="0 0 24 24" fill="none" style={{ marginBottom: 12 }}>
+              <Path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill={colors.accentSoft} stroke={colors.accent} strokeWidth="1.5" />
+              <SvgCircle cx="12" cy="9" r="2.5" stroke={colors.accent} strokeWidth="1.5" />
+              <Path d="M8 18h8M7 21h10" stroke={colors.border} strokeWidth="1.5" strokeLinecap="round" />
+              <Path d="M10 14.5l2 1.5 2-1.5" stroke={colors.textMuted} strokeWidth="1.2" strokeLinecap="round" />
+            </Svg>
+            <Text style={m.gateTitle}>Активируйте местоположение</Text>
+            <Text style={m.gateSub}>Нажмите кнопку «Стать активным», чтобы видеть людей рядом на карте</Text>
+          </View>
+        </View>
+      )}
+
       {/* Active toggle */}
       <TouchableOpacity style={[m.activeBtn, isActive && m.activeBtnOn]} onPress={() => void toggleActive()} activeOpacity={0.85}>
         {activating
@@ -283,6 +327,49 @@ export function MapScreen() {
               </Text>
             </>}
       </TouchableOpacity>
+
+      {/* ── My status message pill ────────────────────────────────────────── */}
+      {isActive && (
+        <View style={m.statusMsgBar}>
+          {editingStatus ? (
+            <View style={m.statusEditRow}>
+              <TextInput
+                style={m.statusInput}
+                value={myStatusMsg}
+                onChangeText={setMyStatusMsg}
+                placeholder="Напишите сообщение для карты..."
+                placeholderTextColor={colors.textMuted}
+                maxLength={140}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => saveStatusMessage(myStatusMsg)} disabled={savingStatus} style={m.statusSaveBtn}>
+                <Text style={m.statusSaveTxt}>{savingStatus ? '...' : 'OK'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => { setEditingStatus(false); }} style={{ paddingHorizontal: 6 }}>
+                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+                  <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textMuted} strokeWidth="2.2" strokeLinecap="round" />
+                </Svg>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={m.statusPill} onPress={() => setEditingStatus(true)} activeOpacity={0.8}>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
+              </Svg>
+              <Text style={m.statusPillTxt} numberOfLines={1}>
+                {myStatusMsg || 'Добавить сообщение на карте...'}
+              </Text>
+              {myStatusMsg ? (
+                <TouchableOpacity onPress={() => saveStatusMessage('')} hitSlop={10}>
+                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                    <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" />
+                  </Svg>
+                </TouchableOpacity>
+              ) : null}
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Return to location */}
       <TouchableOpacity style={m.locBtn} onPress={returnToMe} activeOpacity={0.85}>
@@ -301,6 +388,7 @@ export function MapScreen() {
           key={selectedUser.id}
           user={selectedUser}
           compatibility={computedCompatibility(selectedUser.id) ?? selectedUser.compatibility}
+          statusMessage={(selectedUser as any).mapStatusMessage as string | undefined}
           onClose={() => setSelectedUser(null)}
           onViewProfile={() => {
             const quiz = computedCompatibility(selectedUser.id);
@@ -384,4 +472,39 @@ const m = StyleSheet.create({
   actionBtnSecondary: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: colors.surface, borderRadius: radii.md, paddingVertical: 13, borderWidth: 1.5, borderColor: colors.accent, ...shadows.card },
   actionBtnFollowing: { backgroundColor: colors.accentSoft },
   actionBtnSecondaryTxt: { fontWeight: '600', fontSize: 15 },
+
+  // Location gate
+  locationGate: {
+    ...StyleSheet.absoluteFillObject, zIndex: 15,
+    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.82)',
+  },
+  gateCard: {
+    backgroundColor: colors.surface, borderRadius: radii.xl, padding: 28,
+    alignItems: 'center', maxWidth: 300, ...shadows.card,
+  },
+  gateTitle: { fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 8 },
+  gateSub: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
+
+  // My status message bar
+  statusMsgBar: {
+    position: 'absolute', bottom: 104, left: 16, right: 70, zIndex: 10,
+    backgroundColor: colors.surface, borderRadius: radii.pill,
+    paddingHorizontal: 14, paddingVertical: 8, ...shadows.card,
+    borderWidth: 1, borderColor: colors.border,
+  },
+  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusPillTxt: { flex: 1, fontSize: 13, color: colors.text },
+  statusEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  statusInput: { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 0 },
+  statusSaveBtn: { backgroundColor: colors.accent, borderRadius: radii.sm, paddingHorizontal: 12, paddingVertical: 4 },
+  statusSaveTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+
+  // Status message bubble in user sheet
+  statusMsgBubble: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: colors.accentSoft, borderRadius: radii.md,
+    paddingHorizontal: 14, paddingVertical: 10, marginBottom: 14,
+  },
+  statusMsgBubbleTxt: { flex: 1, fontSize: 14, color: colors.accent, fontStyle: 'italic' },
 });

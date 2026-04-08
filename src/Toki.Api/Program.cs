@@ -10,6 +10,7 @@ using Toki.Api.Infrastructure;
 using Toki.Api.Models;
 using Toki.Api.Options;
 using Toki.Api.Services;
+using Toki.Api.Controllers;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,6 +40,9 @@ builder.Services.AddHostedService<DevUserSeedHostedService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IPasswordHasher<object>, PasswordHasher<object>>();
 builder.Services.AddSingleton<IAppleIdTokenValidator, AppleIdTokenValidator>();
+builder.Services.AddHttpClient("expo-push");
+builder.Services.AddSingleton<IPushNotificationService, PushNotificationService>();
+builder.Services.AddMemoryCache();
 
 var jwt = builder.Configuration.GetSection(JwtOptions.SectionName).Get<JwtOptions>() ?? new JwtOptions();
 if (string.IsNullOrWhiteSpace(jwt.SigningKey) || jwt.SigningKey.Length < 32)

@@ -24,5 +24,10 @@ public sealed class UserProfile
     public bool ShowGifts { get; set; } = true;
     public bool ShowFavoriteCount { get; set; } = true;
     public bool HideOnlineStatus { get; set; }
+
+    /// <summary>Short message visible to others on the map ("I'm nearby, say hi!").</summary>
+    public string? MapStatusMessage { get; set; }
+    public DateTime? MapStatusMessageUpdatedAt { get; set; }
+
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }
