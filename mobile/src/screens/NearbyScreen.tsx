@@ -3,12 +3,12 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { colors, radii } from '../theme';
@@ -166,7 +166,7 @@ export function NearbyScreen() {
           disabled={loading}
         >
           {loading
-            ? <ActivityIndicator color={colors.bg} />
+            ? <ActivityIndicator color={colors.text} />
             : <Text style={[s.toggleText, active && s.toggleTextActive]}>
                 {active ? '● Поиск включён' : '○ Включить поиск'}
               </Text>
@@ -217,7 +217,7 @@ const s = StyleSheet.create({
   },
   toggleActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   toggleText: { color: colors.textMuted, fontWeight: '600', fontSize: 15 },
-  toggleTextActive: { color: colors.bg },
+  toggleTextActive: { color: colors.text },
   error: { color: colors.danger, paddingHorizontal: 20, marginBottom: 8 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyText: { color: colors.text, fontSize: 18, fontWeight: '600', marginTop: 16, textAlign: 'center' },

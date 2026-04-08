@@ -15,6 +15,9 @@ public sealed class User
     public string AuthProvider { get; set; } = "";
     public string ExternalId { get; set; } = "";
 
+    /// <summary>ASP.NET Identity PBKDF2 hash; только для <see cref="AuthProvider"/> == password.</summary>
+    public string? PasswordHash { get; set; }
+
     /// <summary>GeoJSON Point, coordinates [lon, lat]. Indexed 2dsphere.</summary>
     public GeoJsonPoint<GeoJson2DGeographicCoordinates>? Location { get; set; }
 

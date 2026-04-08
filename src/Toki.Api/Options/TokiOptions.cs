@@ -33,3 +33,9 @@ public sealed class AdminOptions
     public const string SectionName = "Admin";
     public string ApiKey { get; init; } = "";
 }
+
+public sealed class DevSeedOptions
+{
+    public const string SectionName = "DevSeed";
+    public bool Enabled { get; init; }
+}

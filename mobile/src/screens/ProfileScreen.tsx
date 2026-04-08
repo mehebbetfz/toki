@@ -1,4 +1,5 @@
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, radii } from '../theme';
 import { useAuthStore } from '../store/useAuthStore';
@@ -31,7 +32,7 @@ export function ProfileScreen() {
         </View>
 
         <View style={s.infoSection}>
-          <InfoRow label="Аккаунт" value="Google / Apple" />
+          <InfoRow label="Аккаунт" value="Почта / Google / Apple" />
           <InfoRow label="Шифрование чата" value="E2E (XOR-demo)" />
           <InfoRow label="Поиск по геолокации" value="100 м" />
         </View>

@@ -3,14 +3,13 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
@@ -151,7 +150,7 @@ export function ChatScreen({ route, navigation }: Props) {
             disabled={!input.trim() || !connected}
           >
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-              <Path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke={colors.bg} strokeWidth="2" strokeLinejoin="round" />
+              <Path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z" stroke={colors.text} strokeWidth="2" strokeLinejoin="round" />
             </Svg>
           </TouchableOpacity>
         </View>
@@ -184,9 +183,9 @@ const s = StyleSheet.create({
   },
   bubbleMine: { backgroundColor: colors.accent, alignSelf: 'flex-end', borderBottomRightRadius: 4 },
   bubbleOther: { backgroundColor: colors.surface, alignSelf: 'flex-start', borderBottomLeftRadius: 4 },
-  bubbleText: { color: colors.bg, fontSize: 15, lineHeight: 20 },
-  bubbleTextMine: { color: colors.bg },
-  time: { color: 'rgba(0,0,0,0.45)', fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
+  bubbleText: { color: colors.text, fontSize: 15, lineHeight: 20 },
+  bubbleTextMine: { color: colors.text },
+  time: { color: 'rgba(255,255,255,0.45)', fontSize: 10, marginTop: 4, alignSelf: 'flex-end' },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -214,5 +213,5 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: { backgroundColor: colors.textMuted },
+  sendBtnDisabled: { backgroundColor: colors.border },
 });

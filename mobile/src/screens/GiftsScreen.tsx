@@ -5,7 +5,6 @@ import {
   FlatList,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,13 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { SvgXml } from 'react-native-svg';
 import { colors, radii } from '../theme';
 import { getGifts, Gift, orderGift } from '../api/client';
 
 const FALLBACK_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect x="3" y="9" width="18" height="13" rx="2" stroke="#3EE8B6" strokeWidth="1.8"/>
-  <path d="M12 9v13M3 13h18M8 9c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#3EE8B6" strokeWidth="1.8" strokeLinecap="round"/>
+  <rect x="3" y="9" width="18" height="13" rx="2" stroke="#FF6B2C" strokeWidth="1.8"/>
+  <path d="M12 9v13M3 13h18M8 9c0-2.2 1.8-4 4-4s4 1.8 4 4" stroke="#FF6B2C" strokeWidth="1.8" strokeLinecap="round"/>
 </svg>`;
 
 function GiftCard({
@@ -71,7 +71,7 @@ export function GiftsScreen() {
     try {
       await orderGift(selectedGift.id, recipientId.trim());
       setSelectedGift(null);
-      Alert.alert('🎁 Готово!', `Подарок «${selectedGift.name}» отправлен!`);
+      Alert.alert('Готово', `Подарок «${selectedGift.name}» отправлен.`);
     } catch (e) {
       Alert.alert('Ошибка', String(e));
     } finally {
@@ -142,7 +142,7 @@ export function GiftsScreen() {
                 disabled={!recipientId.trim() || ordering}
               >
                 {ordering
-                  ? <ActivityIndicator color={colors.bg} />
+                  ? <ActivityIndicator color={colors.text} />
                   : <Text style={s.confirmBtnText}>Подарить за ${selectedGift.priceUsd.toFixed(2)}</Text>
                 }
               </TouchableOpacity>
@@ -193,8 +193,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 18,
     alignItems: 'center',
   },
-  buyBtnText: { color: colors.bg, fontWeight: '700', fontSize: 15 },
-  buyBtnSub: { color: colors.bg, fontSize: 11, opacity: 0.8 },
+  buyBtnText: { color: colors.text, fontWeight: '700', fontSize: 15 },
+  buyBtnSub: { color: colors.text, fontSize: 11, opacity: 0.85 },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.6)',
@@ -233,5 +233,5 @@ const s = StyleSheet.create({
     marginTop: 20,
   },
   confirmBtnDisabled: { opacity: 0.4 },
-  confirmBtnText: { color: colors.bg, fontWeight: '700', fontSize: 16 },
+  confirmBtnText: { color: colors.text, fontWeight: '700', fontSize: 16 },
 });

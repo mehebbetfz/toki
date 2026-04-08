@@ -46,6 +46,32 @@ export async function loginApple(idToken: string) {
   return r.json() as Promise<{ accessToken: string; user: TokiUser }>;
 }
 
+export async function loginEmailPassword(email: string, password: string) {
+  const r = await fetch(`${API_BASE_URL}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  });
+  if (r.status === 401) throw new Error('Неверная почта или пароль');
+  if (!r.ok) throw new Error(`Вход не удался: ${r.status}`);
+  return r.json() as Promise<{ accessToken: string; user: TokiUser }>;
+}
+
+export async function registerEmailPassword(email: string, password: string, displayName?: string) {
+  const r = await fetch(`${API_BASE_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, displayName }),
+  });
+  if (r.status === 409) throw new Error('Аккаунт с такой почтой уже есть');
+  if (r.status === 400) {
+    const t = await r.text();
+    throw new Error(t || 'Проверьте почту и пароль (мин. 8 символов)');
+  }
+  if (!r.ok) throw new Error(`Регистрация не удалась: ${r.status}`);
+  return r.json() as Promise<{ accessToken: string; user: TokiUser }>;
+}
+
 // ─── Proximity ─────────────────────────────────────────────────────────────
 export async function setProximityState(latitude: number, longitude: number, wantsToChat: boolean) {
   const r = await authFetch('/api/proximity/state', {
