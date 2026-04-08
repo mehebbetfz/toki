@@ -41,6 +41,15 @@ public sealed class DevicesController : ControllerBase
         return NoContent();
     }
 
+    // ── Get map status message ────────────────────────────────────────────────
+    [HttpGet("map-status")]
+    public async Task<ActionResult<MapStatusResponse>> GetMapStatus(CancellationToken ct)
+    {
+        var userId = RequireUserId();
+        var p = await _profiles.Find(x => x.UserId == userId).FirstOrDefaultAsync(ct);
+        return Ok(new MapStatusResponse(p?.MapStatusMessage));
+    }
+
     // ── Set map status message ───────────────────────────────────────────────
     [HttpPut("map-status")]
     public async Task<IActionResult> SetMapStatus([FromBody] MapStatusRequest body, CancellationToken ct)
@@ -53,7 +62,8 @@ public sealed class DevicesController : ControllerBase
         var update = Builders<UserProfile>.Update
             .Set(p => p.MapStatusMessage, string.IsNullOrEmpty(msg) ? null : msg)
             .Set(p => p.MapStatusMessageUpdatedAt, DateTime.UtcNow)
-            .Set(p => p.UpdatedAtUtc, DateTime.UtcNow);
+            .Set(p => p.UpdatedAtUtc, DateTime.UtcNow)
+            .SetOnInsert(p => p.UserId, userId);
 
         await _profiles.UpdateOneAsync(filter, update, new UpdateOptions { IsUpsert = true }, ct);
         return NoContent();
@@ -62,3 +72,4 @@ public sealed class DevicesController : ControllerBase
 
 public record RegisterTokenRequest(string Token);
 public record MapStatusRequest(string? Message);
+public record MapStatusResponse(string? Message);

@@ -43,7 +43,7 @@ function StarRating({ value, size = 14 }: { value: number; size?: number }) {
   );
 }
 
-const SHEET_H = SH * 0.72;
+const SHEET_H = SH * 0.52;
 const POST_W  = (Dimensions.get('window').width - 48 - 12) / 3;
 
 export function UserProfileSheet({ user, onClose }: Props) {
@@ -67,6 +67,18 @@ export function UserProfileSheet({ user, onClose }: Props) {
     ]).start(onClose);
   }, [translateY, backdropAlpha, onClose]);
 
+  const goToFullProfile = useCallback(() => {
+    if (!user) return;
+    const payload = JSON.stringify(user);
+    Animated.parallel([
+      Animated.timing(translateY,    { toValue: SHEET_H, duration: 220, useNativeDriver: true, easing: Easing.in(Easing.ease) }),
+      Animated.timing(backdropAlpha, { toValue: 0,       duration: 180, useNativeDriver: true }),
+    ]).start(() => {
+      onClose();
+      setTimeout(() => nav.navigate('UserProfile', { userJson: payload }), 0);
+    });
+  }, [user, translateY, backdropAlpha, onClose, nav]);
+
   if (!user) return null;
 
   const isFollowing  = social.isFollowing(user.id);
@@ -87,8 +99,8 @@ export function UserProfileSheet({ user, onClose }: Props) {
         <View style={s.handle} />
 
         <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
-          {/* Top: avatar + info */}
-          <View style={s.topRow}>
+          {/* Top: avatar + info — tap opens full profile screen */}
+          <TouchableOpacity style={s.topRow} onPress={goToFullProfile} activeOpacity={0.88}>
             <View style={[s.avatar, { backgroundColor: bgColor }]}>
               {user.avatarUri
                 ? <Image source={{ uri: user.avatarUri }} style={s.avatarImg} />
@@ -111,7 +123,7 @@ export function UserProfileSheet({ user, onClose }: Props) {
                 </>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
 
           {/* Hobbies */}
           {user.hobbies && user.hobbies.length > 0 && (

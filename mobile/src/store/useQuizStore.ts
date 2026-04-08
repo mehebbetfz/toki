@@ -5,9 +5,7 @@ import { authFetch } from '../api/client';
 const QUIZ_LAST_KEY   = 'quiz_last_shown';
 const QUIZ_ANSWERS_KEY = 'quiz_answers';
 const HOUR_MS = 60 * 60 * 1000;
-
-// ─── For dev/demo: show modal every 2 minutes instead of every hour ──────────
-const INTERVAL_MS = __DEV__ ? 2 * 60 * 1000 : HOUR_MS;
+const INTERVAL_MS = HOUR_MS;
 
 export interface QuizQuestion {
   id: string;
@@ -59,23 +57,39 @@ export const useQuizStore = create<QuizState>((set, get) => ({
       AsyncStorage.getItem(QUIZ_LAST_KEY),
       AsyncStorage.getItem(QUIZ_ANSWERS_KEY),
     ]);
-    set({
-      lastShownAt: lastRaw ? parseInt(lastRaw, 10) : 0,
-      answers: answersRaw ? JSON.parse(answersRaw) : {},
-    });
+    const answers = answersRaw ? JSON.parse(answersRaw) as Record<string, QuizAnswer> : {};
+    // Первый показ вопроса — не сразу при установке, а через час после первого запуска
+    let lastShown = lastRaw ? parseInt(lastRaw, 10) : 0;
+    if (!lastRaw) {
+      lastShown = Date.now();
+      await AsyncStorage.setItem(QUIZ_LAST_KEY, String(lastShown));
+    }
+    set({ lastShownAt: lastShown, answers });
   },
 
   fetchNextQuestion: async () => {
     set({ loading: true });
+    const answeredIds = new Set(Object.keys(get().answers));
     try {
       const res = await authFetch('/api/questions/next');
       if (res.status === 204) { set({ loading: false, pending: null }); return; }
       if (!res.ok) throw new Error('Failed');
       const q: QuizQuestion = await res.json();
+      if (answeredIds.has(q.id)) {
+        set({ loading: false, pending: null });
+        return;
+      }
       set({ pending: q, loading: false });
     } catch {
-      // Fallback to a local question if API unavailable
-      set({ loading: false, pending: LOCAL_FALLBACK[Math.floor(Math.random() * LOCAL_FALLBACK.length)] });
+      const unanswered = LOCAL_FALLBACK.filter(q => !answeredIds.has(q.id));
+      if (unanswered.length === 0) {
+        set({ loading: false, pending: null });
+        return;
+      }
+      set({
+        loading: false,
+        pending: unanswered[Math.floor(Math.random() * unanswered.length)],
+      });
     }
   },
 

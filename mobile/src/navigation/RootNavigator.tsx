@@ -3,6 +3,7 @@ import { colors } from '../theme';
 import { TabNavigator } from './TabNavigator';
 import { ChatScreen } from '../screens/ChatScreen';
 import { CallScreen } from '../screens/CallScreen';
+import { OtherUserProfileScreen } from '../screens/OtherUserProfileScreen';
 import type { RootStackParamList } from './types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -27,6 +28,18 @@ export function RootNavigator() {
         name="Call"
         component={CallScreen}
         options={{ title: 'Звонок', gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="UserProfile"
+        component={OtherUserProfileScreen}
+        options={({ route }) => {
+          try {
+            const u = JSON.parse(route.params.userJson) as { displayName?: string };
+            return { title: u.displayName ?? 'Профиль', headerBackTitle: 'Назад' };
+          } catch {
+            return { title: 'Профиль', headerBackTitle: 'Назад' };
+          }
+        }}
       />
     </Stack.Navigator>
   );

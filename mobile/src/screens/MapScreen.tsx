@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Animated, Dimensions, Easing, Image,
+  ActivityIndicator, Alert, Animated, Dimensions, Easing, Image, Modal,
   Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from 'react-native';
 import MapView, { Marker, Circle, Region, PROVIDER_DEFAULT } from 'react-native-maps';
@@ -12,7 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useSocialStore } from '../store/useSocialStore';
-import { authFetch, setWantsToChat } from '../api/client';
+import { getMapStatus, setMapStatusMessage, setProximityState } from '../api/client';
 import { UserProfileSheet, type ViewableUser } from '../components/UserProfileSheet';
 import { useQuizStore, MOCK_COMPATIBILITY_ANSWERS } from '../store/useQuizStore';
 
@@ -224,9 +224,28 @@ export function MapScreen() {
 
   const toggleActive = useCallback(async () => {
     setActivating(true);
-    try { await setWantsToChat(!isActive); setIsActive(v => !v); } catch { /* ignore */ }
+    try {
+      let lat = myLocation?.latitude;
+      let lon = myLocation?.longitude;
+      if (lat == null || lon == null) {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert('Нужен доступ', 'Разрешите геолокацию, чтобы стать активным на карте.');
+          setActivating(false);
+          return;
+        }
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        lat = loc.coords.latitude;
+        lon = loc.coords.longitude;
+        setMyLocation({ latitude: lat, longitude: lon });
+      }
+      await setProximityState(lat, lon, !isActive);
+      setIsActive(v => !v);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось обновить статус активности.');
+    }
     setActivating(false);
-  }, [isActive]);
+  }, [isActive, myLocation]);
 
   const handleRegionChange = useCallback((r: Region) => {
     let lat = Math.min(Math.max(r.latitudeDelta, MIN_DELTA), MAX_DELTA);
@@ -248,23 +267,35 @@ export function MapScreen() {
     mapRef.current?.animateToRegion({ ...myLocation, latitudeDelta: MIN_DELTA * 5, longitudeDelta: MIN_DELTA * 5 }, 500);
   }, [myLocation, getLocation]);
 
-  // ── My map status message ──────────────────────────────────────────────────
+  // ── My map status message (modal) ─────────────────────────────────────────
   const [myStatusMsg, setMyStatusMsg] = useState('');
-  const [editingStatus, setEditingStatus] = useState(false);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [statusDraft, setStatusDraft] = useState('');
   const [savingStatus, setSavingStatus] = useState(false);
 
-  const saveStatusMessage = useCallback(async (msg: string) => {
+  useEffect(() => {
+    getMapStatus()
+      .then(d => setMyStatusMsg(d.message ?? ''))
+      .catch(() => {});
+  }, []);
+
+  const openStatusModal = useCallback(() => {
+    setStatusDraft(myStatusMsg);
+    setStatusModalOpen(true);
+  }, [myStatusMsg]);
+
+  const saveStatusMessage = useCallback(async () => {
+    const msg = statusDraft.trim();
     setSavingStatus(true);
     try {
-      await authFetch('/api/devices/map-status', {
-        method: 'PUT',
-        body: JSON.stringify({ message: msg }),
-      });
+      await setMapStatusMessage(msg.length ? msg : null);
       setMyStatusMsg(msg);
-    } catch { Alert.alert('Ошибка', 'Не удалось сохранить'); }
+      setStatusModalOpen(false);
+    } catch {
+      Alert.alert('Ошибка', 'Не удалось сохранить сообщение. Проверьте вход в аккаунт и сервер.');
+    }
     setSavingStatus(false);
-    setEditingStatus(false);
-  }, []);
+  }, [statusDraft]);
 
   return (
     <View style={m.container}>
@@ -295,8 +326,15 @@ export function MapScreen() {
       {/* Header */}
       <View style={m.header}>
         <View style={m.headerCard}>
-          <Text style={m.headerTitle}>Карта</Text>
-          <Text style={m.headerSub}>{visibleUsers.length} чел. рядом</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={m.headerTitle}>Карта</Text>
+            <Text style={m.headerSub}>{visibleUsers.length} чел. рядом</Text>
+          </View>
+          {isActive && (
+            <View style={m.headerActiveWrap} accessibilityLabel="Вы активны на карте">
+              <View style={m.headerActiveDot} />
+            </View>
+          )}
         </View>
       </View>
 
@@ -312,6 +350,16 @@ export function MapScreen() {
             </Svg>
             <Text style={m.gateTitle}>Активируйте местоположение</Text>
             <Text style={m.gateSub}>Нажмите кнопку «Стать активным», чтобы видеть людей рядом на карте</Text>
+            <TouchableOpacity
+              style={m.gateBtn}
+              onPress={() => void toggleActive()}
+              disabled={activating}
+              activeOpacity={0.88}
+            >
+              {activating
+                ? <ActivityIndicator color="#fff" size="small" />
+                : <Text style={m.gateBtnTxt}>Стать активным</Text>}
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -328,48 +376,66 @@ export function MapScreen() {
             </>}
       </TouchableOpacity>
 
-      {/* ── My status message pill ────────────────────────────────────────── */}
+      {/* ── Кнопка сообщения на карте → модалка ввода ─────────────────────────── */}
       {isActive && (
-        <View style={m.statusMsgBar}>
-          {editingStatus ? (
-            <View style={m.statusEditRow}>
-              <TextInput
-                style={m.statusInput}
-                value={myStatusMsg}
-                onChangeText={setMyStatusMsg}
-                placeholder="Напишите сообщение для карты..."
-                placeholderTextColor={colors.textMuted}
-                maxLength={140}
-                autoFocus
-              />
-              <TouchableOpacity onPress={() => saveStatusMessage(myStatusMsg)} disabled={savingStatus} style={m.statusSaveBtn}>
-                <Text style={m.statusSaveTxt}>{savingStatus ? '...' : 'OK'}</Text>
+        <TouchableOpacity style={m.statusMsgBar} onPress={openStatusModal} activeOpacity={0.85}>
+          <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+            <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
+          </Svg>
+          <Text style={m.statusPillTxt} numberOfLines={2}>
+            {myStatusMsg ? myStatusMsg : 'Сообщение для карты — нажмите, чтобы написать'}
+          </Text>
+          <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 20h9M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z" stroke={colors.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </Svg>
+        </TouchableOpacity>
+      )}
+
+      <Modal visible={statusModalOpen} transparent animationType="fade" onRequestClose={() => setStatusModalOpen(false)}>
+        <Pressable style={m.statusModalBackdrop} onPress={() => setStatusModalOpen(false)}>
+          <Pressable style={m.statusModalCard} onPress={e => e.stopPropagation()}>
+            <Text style={m.statusModalTitle}>Сообщение на карте</Text>
+            <Text style={m.statusModalHint}>Его увидят те, кто откроет вашу карточку рядом (до 140 символов).</Text>
+            <TextInput
+              style={m.statusModalInput}
+              value={statusDraft}
+              onChangeText={setStatusDraft}
+              placeholder="Например: сижу в кафе напротив, напишите!"
+              placeholderTextColor={colors.textMuted}
+              maxLength={140}
+              multiline
+            />
+            <Text style={m.statusModalCount}>{statusDraft.length}/140</Text>
+            <View style={m.statusModalActions}>
+              <TouchableOpacity style={m.statusModalCancel} onPress={() => setStatusModalOpen(false)}>
+                <Text style={m.statusModalCancelTxt}>Отмена</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => { setEditingStatus(false); }} style={{ paddingHorizontal: 6 }}>
-                <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-                  <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textMuted} strokeWidth="2.2" strokeLinecap="round" />
-                </Svg>
+              <TouchableOpacity style={m.statusModalSave} onPress={() => void saveStatusMessage()} disabled={savingStatus}>
+                <Text style={m.statusModalSaveTxt}>{savingStatus ? 'Сохранение…' : 'Сохранить'}</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <TouchableOpacity style={m.statusPill} onPress={() => setEditingStatus(true)} activeOpacity={0.8}>
-              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
-                <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
-              </Svg>
-              <Text style={m.statusPillTxt} numberOfLines={1}>
-                {myStatusMsg || 'Добавить сообщение на карте...'}
-              </Text>
-              {myStatusMsg ? (
-                <TouchableOpacity onPress={() => saveStatusMessage('')} hitSlop={10}>
-                  <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
-                    <Path d="M18 6L6 18M6 6l12 12" stroke={colors.textMuted} strokeWidth="2.5" strokeLinecap="round" />
-                  </Svg>
-                </TouchableOpacity>
-              ) : null}
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
+            {myStatusMsg ? (
+              <TouchableOpacity
+                style={m.statusModalClear}
+                onPress={async () => {
+                  setSavingStatus(true);
+                  try {
+                    await setMapStatusMessage(null);
+                    setMyStatusMsg('');
+                    setStatusDraft('');
+                    setStatusModalOpen(false);
+                  } catch {
+                    Alert.alert('Ошибка', 'Не удалось удалить сообщение');
+                  }
+                  setSavingStatus(false);
+                }}
+              >
+                <Text style={m.statusModalClearTxt}>Удалить сообщение</Text>
+              </TouchableOpacity>
+            ) : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Return to location */}
       <TouchableOpacity style={m.locBtn} onPress={returnToMe} activeOpacity={0.85}>
@@ -388,7 +454,7 @@ export function MapScreen() {
           key={selectedUser.id}
           user={selectedUser}
           compatibility={computedCompatibility(selectedUser.id) ?? selectedUser.compatibility}
-          statusMessage={(selectedUser as any).mapStatusMessage as string | undefined}
+          statusMessage={selectedUser.mapStatusMessage}
           onClose={() => setSelectedUser(null)}
           onViewProfile={() => {
             const quiz = computedCompatibility(selectedUser.id);
@@ -422,12 +488,14 @@ const m = StyleSheet.create({
   headerCard: { backgroundColor: colors.surface, borderRadius: radii.xl, paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...shadows.card },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 13, color: colors.textMuted },
+  headerActiveWrap: { justifyContent: 'center', alignItems: 'center', paddingLeft: 8 },
+  headerActiveDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff', ...shadows.card },
 
   // active btn
   activeBtn: { position: 'absolute', top: 116, right: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1.5, borderColor: colors.border, ...shadows.card },
   activeBtnOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   activeDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.textMuted },
-  activeDotOn: { backgroundColor: '#fff' },
+  activeDotOn: { backgroundColor: colors.success },
   activeBtnTxt: { fontSize: 13, fontWeight: '600', color: colors.textMuted },
   activeBtnTxtOn: { color: '#fff' },
 
@@ -484,21 +552,40 @@ const m = StyleSheet.create({
     alignItems: 'center', maxWidth: 300, ...shadows.card,
   },
   gateTitle: { fontSize: 17, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 8 },
-  gateSub: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 19 },
+  gateSub: { fontSize: 13, color: colors.textMuted, textAlign: 'center', lineHeight: 19, marginBottom: 16 },
+  gateBtn: {
+    marginTop: 4, backgroundColor: colors.accent, borderRadius: radii.md,
+    paddingHorizontal: 28, paddingVertical: 12, minWidth: 200, alignItems: 'center', ...shadows.btn,
+  },
+  gateBtnTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
-  // My status message bar
+  // My status message — кнопка открывает модалку
   statusMsgBar: {
     position: 'absolute', bottom: 104, left: 16, right: 70, zIndex: 10,
-    backgroundColor: colors.surface, borderRadius: radii.pill,
-    paddingHorizontal: 14, paddingVertical: 8, ...shadows.card,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    backgroundColor: colors.surface, borderRadius: radii.lg,
+    paddingHorizontal: 14, paddingVertical: 12, ...shadows.card,
     borderWidth: 1, borderColor: colors.border,
   },
-  statusPill: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusPillTxt: { flex: 1, fontSize: 13, color: colors.text },
-  statusEditRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  statusInput: { flex: 1, fontSize: 13, color: colors.text, paddingVertical: 0 },
-  statusSaveBtn: { backgroundColor: colors.accent, borderRadius: radii.sm, paddingHorizontal: 12, paddingVertical: 4 },
-  statusSaveTxt: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  statusPillTxt: { flex: 1, fontSize: 13, color: colors.text, lineHeight: 18 },
+
+  statusModalBackdrop: { flex: 1, backgroundColor: 'rgba(15,22,35,0.5)', justifyContent: 'center', padding: 24 },
+  statusModalCard: { backgroundColor: colors.surface, borderRadius: radii.xl, padding: 20, ...shadows.card },
+  statusModalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 6 },
+  statusModalHint: { fontSize: 13, color: colors.textMuted, marginBottom: 14, lineHeight: 18 },
+  statusModalInput: {
+    borderWidth: 1.5, borderColor: colors.border, borderRadius: radii.md,
+    paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, color: colors.text,
+    minHeight: 100, textAlignVertical: 'top',
+  },
+  statusModalCount: { alignSelf: 'flex-end', fontSize: 11, color: colors.textMuted, marginTop: 4 },
+  statusModalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 18 },
+  statusModalCancel: { paddingVertical: 10, paddingHorizontal: 16 },
+  statusModalCancelTxt: { color: colors.textMuted, fontWeight: '600', fontSize: 15 },
+  statusModalSave: { backgroundColor: colors.accent, borderRadius: radii.md, paddingVertical: 10, paddingHorizontal: 22 },
+  statusModalSaveTxt: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  statusModalClear: { marginTop: 16, alignItems: 'center', paddingVertical: 8 },
+  statusModalClearTxt: { color: colors.textMuted, fontSize: 14, textDecorationLine: 'underline' },
 
   // Status message bubble in user sheet
   statusMsgBubble: {

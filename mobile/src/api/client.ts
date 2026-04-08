@@ -15,7 +15,7 @@ export async function clearToken(): Promise<void> {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
 
-async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const token = await getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -108,12 +108,26 @@ export async function getGifts(): Promise<Gift[]> {
 }
 
 // ─── Convenience wrappers ──────────────────────────────────────────────────
-export async function setWantsToChat(wantsToChat: boolean) {
+export async function setWantsToChat(wantsToChat: boolean, latitude = 0, longitude = 0) {
   const r = await authFetch('/api/proximity/state', {
     method: 'POST',
-    body: JSON.stringify({ latitude: 0, longitude: 0, wantsToChat }),
+    body: JSON.stringify({ latitude, longitude, wantsToChat }),
   });
   if (!r.ok) throw new Error(`setWantsToChat failed: ${r.status}`);
+}
+
+export async function getMapStatus(): Promise<{ message: string | null }> {
+  const r = await authFetch('/api/devices/map-status');
+  if (!r.ok) throw new Error(`map-status: ${r.status}`);
+  return r.json();
+}
+
+export async function setMapStatusMessage(message: string | null) {
+  const r = await authFetch('/api/devices/map-status', {
+    method: 'PUT',
+    body: JSON.stringify({ message: message ?? '' }),
+  });
+  if (!r.ok) throw new Error(`map-status save: ${r.status}`);
 }
 
 export async function orderGift(giftId: string, recipientUserId: string) {
