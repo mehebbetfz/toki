@@ -326,15 +326,8 @@ export function MapScreen() {
       {/* Header */}
       <View style={m.header}>
         <View style={m.headerCard}>
-          <View style={{ flex: 1 }}>
-            <Text style={m.headerTitle}>Карта</Text>
-            <Text style={m.headerSub}>{visibleUsers.length} чел. рядом</Text>
-          </View>
-          {isActive && (
-            <View style={m.headerActiveWrap} accessibilityLabel="Вы активны на карте">
-              <View style={m.headerActiveDot} />
-            </View>
-          )}
+          <Text style={m.headerTitle}>Карта</Text>
+          <Text style={m.headerSub}>{visibleUsers.length} чел. рядом</Text>
         </View>
       </View>
 
@@ -486,11 +479,9 @@ const m = StyleSheet.create({
 
   // header
   header: { position: 'absolute', top: 52, left: 16, right: 16, zIndex: 10 },
-  headerCard: { backgroundColor: colors.surface, borderRadius: radii.xl, paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...shadows.card },
+  headerCard: { backgroundColor: colors.surface, borderRadius: radii.xl, paddingHorizontal: 20, paddingVertical: 12, ...shadows.card },
   headerTitle: { fontSize: 17, fontWeight: '700', color: colors.text },
   headerSub: { fontSize: 13, color: colors.textMuted },
-  headerActiveWrap: { justifyContent: 'center', alignItems: 'center', paddingLeft: 8 },
-  headerActiveDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, borderWidth: 2, borderColor: '#fff', ...shadows.card },
 
   // active btn
   activeBtn: { position: 'absolute', top: 116, right: 16, zIndex: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderRadius: radii.pill, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1.5, borderColor: colors.border, ...shadows.card },
