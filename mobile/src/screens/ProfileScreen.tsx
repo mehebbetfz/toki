@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import {
-  Alert, Dimensions, FlatList, Image, Modal, Pressable,
-  SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput,
+  ActionSheetIOS, Alert, Dimensions, FlatList, Image, Modal, Platform,
+  Pressable, SafeAreaView, ScrollView, StyleSheet, Switch, Text, TextInput,
   TouchableOpacity, View,
 } from 'react-native';
-import Svg, { Path, Circle, Rect, Polyline } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { colors, radii, shadows } from '../theme';
 import { useAuthStore } from '../store/useAuthStore';
@@ -135,7 +135,7 @@ const pv = StyleSheet.create({
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 export function ProfileScreen() {
-  const { user, logout } = useAuthStore();
+  const { user, avatarUri, logout, updateProfile } = useAuthStore();
   const social = useSocialStore();
 
   const [fields, setFields] = useState<ProfileField[]>(DEFAULT_FIELDS);
@@ -150,6 +150,14 @@ export function ProfileScreen() {
   const [editValue, setEditValue] = useState('');
   const [viewerIndex, setViewerIndex] = useState(0);
   const [viewerOpen, setViewerOpen] = useState(false);
+
+  // ── inline name / bio edit ──────────────────────────────────────────────
+  const [editingName, setEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(user?.displayName ?? '');
+  const [bio, setBio] = useState('');
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioValue, setBioValue] = useState('');
+
   const MOCK_FAV_COUNT = 47;
 
   const toggleHobby = (h: string) => setHobbies(prev => prev.includes(h) ? prev.filter(x => x !== h) : [...prev, h]);
@@ -171,6 +179,46 @@ export function ProfileScreen() {
     setPosts(prev => [{ id: `p_${Date.now()}`, uri: result.assets[0].uri, caption: '', likes: 0 }, ...prev]);
   }, []);
 
+  // ── Avatar picker ──────────────────────────────────────────────────────
+  const pickAvatar = useCallback(async (source: 'library' | 'camera') => {
+    const perm = source === 'camera'
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm.status !== 'granted') { Alert.alert('Нет доступа к ' + (source === 'camera' ? 'камере' : 'галерее')); return; }
+    const result = source === 'camera'
+      ? await ImagePicker.launchCameraAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.9 })
+      : await ImagePicker.launchImageLibraryAsync({ allowsEditing: true, aspect: [1, 1], quality: 0.9 });
+    if (result.canceled) return;
+    updateProfile({ avatarUri: result.assets[0].uri });
+  }, [updateProfile]);
+
+  const onAvatarPress = useCallback(() => {
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: ['Камера', 'Из галереи', 'Отмена'], cancelButtonIndex: 2 },
+        i => { if (i === 0) void pickAvatar('camera'); if (i === 1) void pickAvatar('library'); },
+      );
+    } else {
+      Alert.alert('Фото профиля', '', [
+        { text: 'Камера', onPress: () => void pickAvatar('camera') },
+        { text: 'Из галереи', onPress: () => void pickAvatar('library') },
+        { text: 'Отмена', style: 'cancel' },
+      ]);
+    }
+  }, [pickAvatar]);
+
+  // ── Name save ─────────────────────────────────────────────────────────
+  const saveName = useCallback(() => {
+    const trimmed = nameValue.trim();
+    if (trimmed) updateProfile({ displayName: trimmed });
+    setEditingName(false);
+  }, [nameValue, updateProfile]);
+
+  const saveBio = useCallback(() => {
+    setBio(bioValue.trim());
+    setEditingBio(false);
+  }, [bioValue]);
+
   const TABS = [
     { key: 'posts', label: 'Посты', Icon: GridIcon },
     { key: 'gifts', label: 'Дары', Icon: GiftSvg },
@@ -184,13 +232,77 @@ export function ProfileScreen() {
 
         {/* ── Header ── */}
         <View style={ps.header}>
-          <View style={ps.avatarOuter}>
-            <View style={ps.avatarInner}>
-              <Text style={ps.avatarText}>{user?.displayName?.charAt(0).toUpperCase() ?? '?'}</Text>
+          {/* Avatar with camera badge */}
+          <TouchableOpacity onPress={onAvatarPress} activeOpacity={0.82} style={ps.avatarOuter}>
+            {avatarUri
+              ? <Image source={{ uri: avatarUri }} style={ps.avatarImage} />
+              : <View style={ps.avatarInner}>
+                  <Text style={ps.avatarText}>{(user?.displayName ?? '?').charAt(0).toUpperCase()}</Text>
+                </View>}
+            <View style={ps.cameraBadge}>
+              <Svg width={13} height={13} viewBox="0 0 24 24" fill="none">
+                <Path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="#fff" strokeWidth="2" strokeLinejoin="round" />
+                <Circle cx="12" cy="13" r="4" stroke="#fff" strokeWidth="2" />
+              </Svg>
             </View>
-          </View>
-          <Text style={ps.name}>{user?.displayName ?? 'Toki User'}</Text>
+          </TouchableOpacity>
+
+          {/* Editable name */}
+          {editingName ? (
+            <View style={ps.nameEditRow}>
+              <TextInput
+                style={ps.nameInput}
+                value={nameValue}
+                onChangeText={setNameValue}
+                autoFocus
+                returnKeyType="done"
+                onSubmitEditing={saveName}
+                onBlur={saveName}
+                maxLength={40}
+              />
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => { setNameValue(user?.displayName ?? ''); setEditingName(true); }} style={ps.nameRow}>
+              <Text style={ps.name}>{user?.displayName ?? 'Toki User'}</Text>
+              <Svg width={14} height={14} viewBox="0 0 24 24" fill="none">
+                <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                  stroke={colors.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </TouchableOpacity>
+          )}
+
           <Text style={ps.email}>{user?.email ?? ''}</Text>
+
+          {/* Editable bio */}
+          {editingBio ? (
+            <View style={ps.bioEditWrap}>
+              <TextInput
+                style={ps.bioInput}
+                value={bioValue}
+                onChangeText={setBioValue}
+                autoFocus
+                multiline
+                placeholder="Расскажи о себе..."
+                placeholderTextColor={colors.textMuted}
+                returnKeyType="done"
+                blurOnSubmit
+                onBlur={saveBio}
+                maxLength={150}
+              />
+            </View>
+          ) : (
+            <TouchableOpacity onPress={() => { setBioValue(bio); setEditingBio(true); }} style={ps.bioRow}>
+              <Text style={[ps.bioText, !bio && ps.bioPlaceholder]}>
+                {bio || 'Добавить описание...'}
+              </Text>
+              {!!bio && (
+                <Svg width={12} height={12} viewBox="0 0 24 24" fill="none">
+                  <Path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"
+                    stroke={colors.textMuted} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </Svg>
+              )}
+            </TouchableOpacity>
+          )}
 
           <View style={ps.statsRow}>
             <View style={ps.stat}><Text style={ps.statNum}>{posts.length}</Text><Text style={ps.statLabel}>постов</Text></View>
@@ -349,12 +461,22 @@ export function ProfileScreen() {
 
 const ps = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  header: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 20, paddingBottom: 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },
-  avatarOuter: { width: 88, height: 88, borderRadius: 44, borderWidth: 3, borderColor: colors.accent, padding: 3, marginBottom: 10 },
-  avatarInner: { flex: 1, borderRadius: 40, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#fff', fontSize: 32, fontWeight: '700' },
+  header: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.border },
+  avatarOuter: { width: 92, height: 92, borderRadius: 46, borderWidth: 3, borderColor: colors.accent, padding: 2, marginBottom: 12, position: 'relative' },
+  avatarImage: { width: '100%', height: '100%', borderRadius: 44 },
+  avatarInner: { flex: 1, borderRadius: 42, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: 34, fontWeight: '700' },
+  cameraBadge: { position: 'absolute', bottom: 0, right: 0, width: 26, height: 26, borderRadius: 13, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.surface },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  nameEditRow: { marginBottom: 2 },
+  nameInput: { fontSize: 20, fontWeight: '700', color: colors.text, borderBottomWidth: 2, borderColor: colors.accent, paddingHorizontal: 4, paddingVertical: 2, minWidth: 160, textAlign: 'center' },
   name: { fontSize: 20, fontWeight: '700', color: colors.text },
-  email: { fontSize: 13, color: colors.textMuted, marginTop: 2 },
+  email: { fontSize: 13, color: colors.textMuted, marginTop: 1 },
+  bioRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6, marginBottom: 2, paddingHorizontal: 8 },
+  bioText: { fontSize: 13, color: colors.text, textAlign: 'center', lineHeight: 18 },
+  bioPlaceholder: { color: colors.textMuted, fontStyle: 'italic' },
+  bioEditWrap: { width: '100%', marginTop: 6, marginBottom: 2 },
+  bioInput: { fontSize: 13, color: colors.text, borderWidth: 1, borderColor: colors.accent, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 8, textAlign: 'center', lineHeight: 18 },
   statsRow: { flexDirection: 'row', alignItems: 'center', marginTop: 16, marginBottom: 12 },
   stat: { flex: 1, alignItems: 'center' },
   statNum: { fontSize: 17, fontWeight: '700', color: colors.text },

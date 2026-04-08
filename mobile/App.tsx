@@ -53,7 +53,7 @@ export default function App() {
   if (initializing) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: 'center', alignItems: 'center' }}>
-        <StatusBar style="light" />
+        <StatusBar style="dark" />
         <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
@@ -61,11 +61,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="light" />
+      <StatusBar style="dark" backgroundColor={colors.surface} translucent={false} />
       {isLoggedIn ? (
         <NavigationContainer
           theme={{
-            dark: true,
+            dark: false,
             colors: {
               primary: colors.accent,
               background: colors.bg,
