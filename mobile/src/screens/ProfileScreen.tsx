@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActionSheetIOS, ActivityIndicator, Alert, Dimensions, FlatList, Image,
   Modal, Platform, Pressable, SafeAreaView, StyleSheet, Switch, Text,
-  TextInput, TouchableOpacity, View,
+  TextInput, TouchableOpacity, View, Share,
 } from 'react-native';
 import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,9 +15,18 @@ const CELL_SIZE = (SW - 3) / 3; // 3 columns, 1px gaps
 const PAGE_SIZE = 9;             // load 9 posts per page (3 rows)
 
 // ─── Post pool (30 items, simulates server data) ─────────────────────────────
-const ALL_POSTS = Array.from({ length: 30 }, (_, i) => ({
+type Post = {
+  id: string;
+  uri: string;
+  caption: string;
+  likes: number;
+  pinned: boolean;
+};
+
+const ALL_POSTS: Post[] = Array.from({ length: 30 }, (_, i) => ({
   id: `p${i + 1}`,
   uri: `https://picsum.photos/seed/toki${i + 1}/600/600`,
+  pinned: false,
   caption: [
     'Отличный день! ☀️', 'Природа и спокойствие 🌿', 'Кофе и код ☕',
     'Вечерний Баку 🌃', '', 'Горы зовут 🏔', 'Закат у моря 🌊',
@@ -30,7 +39,7 @@ const ALL_POSTS = Array.from({ length: 30 }, (_, i) => ({
     'Встреча с природой 🦋', 'Арт-выставка 🎨', 'Новые горизонты 🌍',
   ][i] ?? '',
   likes: Math.floor(Math.random() * 50) + 3,
-}));
+})) as Post[];
 
 // ─── Mock gifts ──────────────────────────────────────────────────────────────
 const MOCK_GIFTS = [
@@ -53,7 +62,7 @@ const DEFAULT_FIELDS: ProfileField[] = [
 const HOBBIES = ['Музыка','Кино','Спорт','Путешествия','Фото','Дизайн','Чтение','Кулинария','Танцы','Йога','Гейминг','Арт'];
 
 type Tab = 'posts' | 'gifts' | 'info' | 'settings';
-type Post = typeof ALL_POSTS[0];
+// Post type already defined above
 
 // ─── SVG icons ───────────────────────────────────────────────────────────────
 const GridIcon   = ({ c }: { c: string }) => <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Rect x="3" y="3" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="14" y="3" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="3" y="14" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="14" y="14" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/></Svg>;
@@ -178,9 +187,47 @@ export function ProfileScreen() {
     if (status !== 'granted') { Alert.alert('Нет доступа к галерее'); return; }
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.85 });
     if (result.canceled) return;
-    const newPost: Post = { id: `up_${Date.now()}`, uri: result.assets[0].uri, caption: '', likes: 0 };
+    const newPost: Post = { id: `up_${Date.now()}`, uri: result.assets[0].uri, caption: '', likes: 0, pinned: false };
     setUserPosts(prev => [newPost, ...prev]);
   }, []);
+
+  // ── Pin / unpin post ───────────────────────────────────────────────────
+  const togglePin = useCallback((id: string) => {
+    setUserPosts(prev => {
+      const updated = prev.map(p => p.id === id ? { ...p, pinned: !p.pinned } : p);
+      // pinned posts float to front
+      return [...updated.filter(p => p.pinned), ...updated.filter(p => !p.pinned)];
+    });
+  }, []);
+
+  const deletePost = useCallback((id: string) => {
+    setUserPosts(prev => prev.filter(p => p.id !== id));
+  }, []);
+
+  const onPostLongPress = useCallback((post: Post) => {
+    const isPinned = post.pinned;
+    const opts = [isPinned ? 'Открепить' : 'Закрепить', 'Поделиться', 'Удалить пост', 'Отмена'];
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options: opts, destructiveButtonIndex: 2, cancelButtonIndex: 3 },
+        i => {
+          if (i === 0) togglePin(post.id);
+          if (i === 1) void Share.share({ url: post.uri });
+          if (i === 2) Alert.alert('Удалить пост?', '', [
+            { text: 'Отмена', style: 'cancel' },
+            { text: 'Удалить', style: 'destructive', onPress: () => deletePost(post.id) },
+          ]);
+        },
+      );
+    } else {
+      Alert.alert('Действие', '', [
+        { text: isPinned ? 'Открепить' : 'Закрепить', onPress: () => togglePin(post.id) },
+        { text: 'Поделиться', onPress: () => void Share.share({ message: post.uri }) },
+        { text: 'Удалить', style: 'destructive', onPress: () => deletePost(post.id) },
+        { text: 'Отмена', style: 'cancel' },
+      ]);
+    }
+  }, [togglePin, deletePost]);
 
   // ── Avatar ─────────────────────────────────────────────────────────────
   const pickAvatar = useCallback(async (src: 'camera' | 'library') => {
@@ -383,9 +430,24 @@ export function ProfileScreen() {
 
   // ── Grid cell renderer (posts tab only) ─────────────────────────────────
   const renderCell = useCallback(({ item, index }: { item: Post; index: number }) => (
-    <TouchableOpacity style={ps.cell} onPress={() => openViewer(index)} activeOpacity={0.82}>
+    <TouchableOpacity
+      style={ps.cell}
+      onPress={() => openViewer(index)}
+      onLongPress={() => onPostLongPress(item)}
+      delayLongPress={380}
+      activeOpacity={0.82}
+    >
       <Image source={{ uri: item.uri }} style={ps.cellImg} />
-      {social.isLiked(item.id) && (
+      {/* Pin badge */}
+      {item.pinned && (
+        <View style={ps.pinBadge}>
+          <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+            <Path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" fill="#fff" />
+          </Svg>
+        </View>
+      )}
+      {/* Like badge */}
+      {social.isLiked(item.id) && !item.pinned && (
         <View style={ps.likedPin}>
           <Svg width={9} height={9} viewBox="0 0 24 24" fill="none">
             <Path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l7.78-7.78a5.5 5.5 0 000-7.78z" fill="#F05A7E"/>
@@ -393,7 +455,7 @@ export function ProfileScreen() {
         </View>
       )}
     </TouchableOpacity>
-  ), [openViewer, social]);
+  ), [openViewer, social, onPostLongPress]);
 
   const renderEmpty = useCallback(() => (
     <View style={{ alignItems: 'center', paddingTop: 48 }}>
@@ -493,6 +555,7 @@ const ps = StyleSheet.create({
   cell: { width: CELL_SIZE, height: CELL_SIZE, position: 'relative', marginBottom: 1.5 },
   cellImg: { width: CELL_SIZE, height: CELL_SIZE, backgroundColor: colors.surface2 },
   likedPin: { position: 'absolute', bottom: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' },
+  pinBadge: { position: 'absolute', top: 5, left: 5, width: 20, height: 20, borderRadius: 10, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', ...shadows.btn },
 
   // section (gifts / info / settings)
   section: { padding: 20, backgroundColor: colors.bg },
