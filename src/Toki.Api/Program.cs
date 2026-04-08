@@ -34,6 +34,7 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
 
 builder.Services.AddHostedService<MongoIndexesHostedService>();
 builder.Services.AddHostedService<GiftSeedHostedService>();
+builder.Services.AddHostedService<QuestionSeedHostedService>();
 builder.Services.AddHostedService<DevUserSeedHostedService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IPasswordHasher<object>, PasswordHasher<object>>();

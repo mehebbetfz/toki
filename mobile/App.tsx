@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +11,8 @@ import { useAuthStore } from './src/store/useAuthStore';
 import { getToken, TokiUser } from './src/api/client';
 import { ActivityIndicator, View } from 'react-native';
 import { API_BASE_URL } from './src/config';
+import { QuizModal } from './src/components/QuizModal';
+import { useQuizStore } from './src/store/useQuizStore';
 
 function decodeJwtPayload(token: string): { sub: string; email: string } | null {
   try {
@@ -25,7 +28,9 @@ function decodeJwtPayload(token: string): { sub: string; email: string } | null 
 
 export default function App() {
   const { isLoggedIn, setAuth } = useAuthStore();
+  const { init: initQuiz, shouldShowNow, fetchNextQuestion, markShown } = useQuizStore();
   const [initializing, setInitializing] = useState(true);
+  const quizTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -49,6 +54,28 @@ export default function App() {
       }
     })();
   }, [setAuth]);
+
+  // ── Quiz timer: check every 30 seconds if it's time to show ────────────────
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    initQuiz().then(() => {
+      if (shouldShowNow()) { markShown(); fetchNextQuestion(); }
+    });
+
+    quizTimerRef.current = setInterval(() => {
+      if (shouldShowNow()) { markShown(); fetchNextQuestion(); }
+    }, 30_000);
+
+    // Also check when app comes to foreground
+    const sub = AppState.addEventListener('change', (state: AppStateStatus) => {
+      if (state === 'active' && shouldShowNow()) { markShown(); fetchNextQuestion(); }
+    });
+
+    return () => {
+      if (quizTimerRef.current) clearInterval(quizTimerRef.current);
+      sub.remove();
+    };
+  }, [isLoggedIn]);
 
   if (initializing) {
     return (
@@ -84,6 +111,8 @@ export default function App() {
         >
           <RootNavigator />
         </NavigationContainer>
+        {/* Hourly quiz modal — renders above everything */}
+        <QuizModal />
       ) : (
         <AuthScreen />
       )}

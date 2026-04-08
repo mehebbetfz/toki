@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../navigation/types';
 import { useSocialStore } from '../store/useSocialStore';
 import { setWantsToChat } from '../api/client';
 import { UserProfileSheet, type ViewableUser } from '../components/UserProfileSheet';
+import { useQuizStore, MOCK_COMPATIBILITY_ANSWERS } from '../store/useQuizStore';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const MIN_DELTA = 0.0018;
@@ -37,7 +38,9 @@ function StarRating({ value, size = 11 }: { value: number; size?: number }) {
 }
 
 // ─── Map marker ──────────────────────────────────────────────────────────────
-function UserMarker({ user, isFollowing, onPress }: { user: MockUser; isFollowing: boolean; onPress: () => void }) {
+function UserMarker({ user, isFollowing, compatibility, onPress }: {
+  user: MockUser; isFollowing: boolean; compatibility: number; onPress: () => void;
+}) {
   return (
     <Marker coordinate={{ latitude: user.latitude, longitude: user.longitude }} onPress={onPress} anchor={{ x: 0.5, y: 1 }}>
       <View style={m.markerWrap}>
@@ -53,7 +56,7 @@ function UserMarker({ user, isFollowing, onPress }: { user: MockUser; isFollowin
             </View>
           )}
         </View>
-        <StarRating value={user.compatibility} size={10} />
+        <StarRating value={compatibility} size={10} />
         <View style={[m.markerTail, { borderTopColor: isFollowing ? colors.accent : user.avatarColor }]} />
       </View>
     </Marker>
@@ -61,7 +64,7 @@ function UserMarker({ user, isFollowing, onPress }: { user: MockUser; isFollowin
 }
 
 // ─── Animated bottom sheet ────────────────────────────────────────────────────
-function UserSheet({ user, onClose, onViewProfile }: { user: MockUser; onClose: () => void; onViewProfile: () => void }) {
+function UserSheet({ user, onClose, onViewProfile, compatibility }: { user: MockUser; onClose: () => void; onViewProfile: () => void; compatibility: number }) {
   const nav = useNavigation<Nav>();
   const social = useSocialStore();
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
@@ -113,8 +116,8 @@ function UserSheet({ user, onClose, onViewProfile }: { user: MockUser; onClose: 
           <TouchableOpacity onPress={onViewProfile} activeOpacity={0.8} style={{ flex: 1 }}>
             <Text style={m.sheetName}>{user.displayName}</Text>
             <Text style={m.sheetAge}>{user.age} лет</Text>
-            <StarRating value={user.compatibility} size={15} />
-            <Text style={m.sheetCompat}>{(user.compatibility * 20).toFixed(0)}% совместимость</Text>
+            <StarRating value={compatibility} size={15} />
+            <Text style={m.sheetCompat}>{(compatibility * 20).toFixed(0)}% совместимость</Text>
           </TouchableOpacity>
         </View>
 
@@ -187,6 +190,14 @@ export function MapScreen() {
   const [visibleUsers, setVisibleUsers] = useState<MockUser[]>(MOCK_USERS);
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
+  const { getCompatibilityScore } = useQuizStore();
+
+  // Compute quiz-based compatibility for each mock user
+  const computedCompatibility = useCallback((userId: string) => {
+    const theirAnswers = MOCK_COMPATIBILITY_ANSWERS[userId];
+    if (!theirAnswers) return null; // will fall back to static value
+    return getCompatibilityScore(theirAnswers);
+  }, [getCompatibilityScore]);
 
   const getLocation = useCallback(async () => {
     setLocLoading(true);
@@ -243,7 +254,13 @@ export function MapScreen() {
           <Circle center={myLocation} radius={100} fillColor="rgba(91,110,245,0.08)" strokeColor="rgba(91,110,245,0.25)" strokeWidth={1.5} />
         )}
         {visibleUsers.map(u => (
-          <UserMarker key={u.id} user={u} isFollowing={social.isFollowing(u.id)} onPress={() => setSelectedUser(u)} />
+          <UserMarker
+            key={u.id}
+            user={u}
+            isFollowing={social.isFollowing(u.id)}
+            compatibility={computedCompatibility(u.id) ?? u.compatibility}
+            onPress={() => setSelectedUser(u)}
+          />
         ))}
       </MapView>
 
@@ -283,8 +300,10 @@ export function MapScreen() {
         <UserSheet
           key={selectedUser.id}
           user={selectedUser}
+          compatibility={computedCompatibility(selectedUser.id) ?? selectedUser.compatibility}
           onClose={() => setSelectedUser(null)}
           onViewProfile={() => {
+            const quiz = computedCompatibility(selectedUser.id);
             setProfileUser({
               id: selectedUser.id,
               displayName: selectedUser.displayName,
@@ -292,7 +311,7 @@ export function MapScreen() {
               avatarColor: selectedUser.avatarColor,
               age: selectedUser.age,
               hobbies: selectedUser.hobbies,
-              compatibility: selectedUser.compatibility,
+              compatibility: quiz ?? selectedUser.compatibility,
               posts: selectedUser.posts,
             });
           }}
