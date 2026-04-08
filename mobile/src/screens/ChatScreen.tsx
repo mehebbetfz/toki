@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert, FlatList, Image, KeyboardAvoidingView, Platform,
   Pressable, SafeAreaView, StyleSheet, Text, TextInput,
-  TouchableOpacity, View, Animated,
+  TouchableOpacity, View,
 } from 'react-native';
+import { UserProfileSheet } from '../components/UserProfileSheet';
+import { MOCK_USERS } from '../mocks/mockUsers';
 import Svg, { Path, Circle, Rect, Line } from 'react-native-svg';
 import * as ImagePicker from 'expo-image-picker';
 import { Audio } from 'expo-av';
@@ -73,14 +75,33 @@ export function ChatScreen({ route, navigation }: Props) {
   const [isTyping, setIsTyping] = useState(false);
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+
+  // Build ViewableUser from mock or minimal info
+  const mockUser = MOCK_USERS.find(u => u.id === otherUserId);
+  const viewableUser = {
+    id: otherUserId,
+    displayName: otherName,
+    avatarInitials: mockUser?.avatarInitials ?? otherName.slice(0, 2).toUpperCase(),
+    avatarColor: mockUser?.avatarColor,
+    age: mockUser?.age,
+    hobbies: mockUser?.hobbies,
+    compatibility: mockUser?.compatibility,
+    posts: mockUser?.posts,
+  };
   const listRef = useRef<FlatList>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { connRef, connected } = useSignalR('chat');
 
   useEffect(() => {
     navigation.setOptions({
-      title: otherName,
       headerBackTitle: 'Назад',
+      headerTitle: () => (
+        <TouchableOpacity onPress={() => setShowProfile(true)} activeOpacity={0.7} style={{ alignItems: 'center' }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F1623' }}>{otherName}</Text>
+          <Text style={{ fontSize: 11, color: '#6B7A99' }}>нажмите для профиля</Text>
+        </TouchableOpacity>
+      ),
     });
   }, [navigation, otherName]);
 
@@ -265,6 +286,7 @@ export function ChatScreen({ route, navigation }: Props) {
 
   return (
     <SafeAreaView style={cs.safe}>
+      <UserProfileSheet user={showProfile ? viewableUser : null} onClose={() => setShowProfile(false)} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={88}>
 
         <FlatList

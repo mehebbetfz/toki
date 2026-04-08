@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
 import { useSocialStore } from '../store/useSocialStore';
 import { setWantsToChat } from '../api/client';
+import { UserProfileSheet, type ViewableUser } from '../components/UserProfileSheet';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 const MIN_DELTA = 0.0018;
@@ -60,7 +61,7 @@ function UserMarker({ user, isFollowing, onPress }: { user: MockUser; isFollowin
 }
 
 // ─── Animated bottom sheet ────────────────────────────────────────────────────
-function UserSheet({ user, onClose }: { user: MockUser; onClose: () => void }) {
+function UserSheet({ user, onClose, onViewProfile }: { user: MockUser; onClose: () => void; onViewProfile: () => void }) {
   const nav = useNavigation<Nav>();
   const social = useSocialStore();
   const translateY = useRef(new Animated.Value(SHEET_H)).current;
@@ -97,22 +98,24 @@ function UserSheet({ user, onClose }: { user: MockUser; onClose: () => void }) {
 
         {/* Avatar + name */}
         <View style={m.sheetTop}>
-          <View style={[m.sheetAvatar, { backgroundColor: user.avatarColor }]}>
-            <Text style={m.sheetAvatarTxt}>{user.avatarInitials}</Text>
-            {social.isFollowing(user.id) && (
-              <View style={m.sheetFollowBadge}>
-                <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
-                  <Path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
-                </Svg>
-              </View>
-            )}
-          </View>
-          <View style={{ flex: 1 }}>
+          <TouchableOpacity onPress={onViewProfile} activeOpacity={0.82}>
+            <View style={[m.sheetAvatar, { backgroundColor: user.avatarColor }]}>
+              <Text style={m.sheetAvatarTxt}>{user.avatarInitials}</Text>
+              {social.isFollowing(user.id) && (
+                <View style={m.sheetFollowBadge}>
+                  <Svg width={10} height={10} viewBox="0 0 24 24" fill="none">
+                    <Path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                  </Svg>
+                </View>
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onViewProfile} activeOpacity={0.8} style={{ flex: 1 }}>
             <Text style={m.sheetName}>{user.displayName}</Text>
             <Text style={m.sheetAge}>{user.age} лет</Text>
             <StarRating value={user.compatibility} size={15} />
             <Text style={m.sheetCompat}>{(user.compatibility * 20).toFixed(0)}% совместимость</Text>
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* Hobbies */}
@@ -180,6 +183,7 @@ export function MapScreen() {
   const [myLocation, setMyLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locLoading, setLocLoading] = useState(false);
   const [selectedUser, setSelectedUser] = useState<MockUser | null>(null);
+  const [profileUser, setProfileUser] = useState<ViewableUser | null>(null);
   const [visibleUsers, setVisibleUsers] = useState<MockUser[]>(MOCK_USERS);
   const [isActive, setIsActive] = useState(false);
   const [activating, setActivating] = useState(false);
@@ -274,14 +278,29 @@ export function MapScreen() {
             </Svg>}
       </TouchableOpacity>
 
-      {/* Animated bottom sheet — key forces remount/animation per user */}
+      {/* Animated bottom sheet */}
       {selectedUser && (
         <UserSheet
           key={selectedUser.id}
           user={selectedUser}
           onClose={() => setSelectedUser(null)}
+          onViewProfile={() => {
+            setProfileUser({
+              id: selectedUser.id,
+              displayName: selectedUser.displayName,
+              avatarInitials: selectedUser.avatarInitials,
+              avatarColor: selectedUser.avatarColor,
+              age: selectedUser.age,
+              hobbies: selectedUser.hobbies,
+              compatibility: selectedUser.compatibility,
+              posts: selectedUser.posts,
+            });
+          }}
         />
       )}
+
+      {/* Full profile sheet */}
+      <UserProfileSheet user={profileUser} onClose={() => setProfileUser(null)} />
     </View>
   );
 }

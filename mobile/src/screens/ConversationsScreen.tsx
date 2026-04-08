@@ -11,6 +11,11 @@ import type { RootStackParamList } from '../navigation/types';
 import { MOCK_USERS } from '../mocks/mockUsers';
 import { useSocialStore } from '../store/useSocialStore';
 import { useSignalR } from '../hooks/useSignalR';
+import { StoriesBar } from '../components/StoriesBar';
+import { StoryViewer } from '../components/StoryViewer';
+import * as ImagePicker from 'expo-image-picker';
+import { useStoriesStore } from '../store/useStoriesStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 type VisibilityFilter = 'all' | 'inbox' | 'archived';
@@ -63,11 +68,30 @@ export function ConversationsScreen() {
   const nav = useNavigation<Nav>();
   const social = useSocialStore();
   const { connRef } = useSignalR('chat');
+  const myUser = useAuthStore(s => s.user);
+  const { addStory } = useStoriesStore();
 
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<VisibilityFilter>('inbox');
   const [convs, setConvs] = useState<Conversation[]>([GROUP_CONV, ...BASE_CONVERSATIONS]);
   const [typingMap, setTypingMap] = useState<Record<string, boolean>>({});
+  const [viewingStoriesUserId, setViewingStoriesUserId] = useState<string | null>(null);
+
+  const handleAddStory = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') { Alert.alert('Нет доступа', 'Разрешите доступ к галерее'); return; }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const asset = result.assets[0];
+      addStory(asset.uri, asset.type === 'video' ? 'video' : 'image', myUser?.id ?? 'me');
+      setViewingStoriesUserId(myUser?.id ?? 'me');
+    }
+  }, [addStory, myUser]);
 
   const archive = useCallback((userId: string) => {
     setConvs(prev => prev.map(c => c.userId === userId ? { ...c, archived: !c.archived } : c));
@@ -211,6 +235,14 @@ export function ConversationsScreen() {
         ))}
       </View>
 
+      {/* Stories strip */}
+      {filter === 'inbox' && (
+        <StoriesBar
+          onOpenStories={setViewingStoriesUserId}
+          onAddStory={handleAddStory}
+        />
+      )}
+
       {filtered.length === 0 ? (
         <View style={s.empty}>
           <Text style={s.emptyText}>{filter === 'archived' ? 'Архив пуст' : 'Нет переписок'}</Text>
@@ -224,6 +256,9 @@ export function ConversationsScreen() {
           ItemSeparatorComponent={() => <View style={s.sep} />}
         />
       )}
+
+      {/* Story fullscreen viewer */}
+      <StoryViewer userId={viewingStoriesUserId} onClose={() => setViewingStoriesUserId(null)} />
     </SafeAreaView>
   );
 }
