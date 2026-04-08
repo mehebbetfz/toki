@@ -9,6 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { colors, radii, shadows } from '../theme';
 import { useAuthStore } from '../store/useAuthStore';
 import { useSocialStore } from '../store/useSocialStore';
+import { useProfileSettingsStore, type ProfileField } from '../store/useProfileSettingsStore';
 
 const { width: SW } = Dimensions.get('window');
 const CELL_SIZE = (SW - 3) / 3; // 3 columns, 1px gaps
@@ -50,25 +51,15 @@ const MOCK_GIFTS = [
   { id: '5', name: 'Ракета', emoji: '🚀', count: 1 },
 ];
 
-interface ProfileField { key: string; label: string; value: string; visible: boolean; }
-const DEFAULT_FIELDS: ProfileField[] = [
-  { key: 'age',          label: 'Возраст',    value: '25',          visible: true  },
-  { key: 'city',         label: 'Город',      value: 'Баку',        visible: true  },
-  { key: 'occupation',   label: 'Работа',     value: 'Разработчик', visible: true  },
-  { key: 'education',    label: 'Образование',value: 'БГТУ',        visible: false },
-  { key: 'languages',    label: 'Языки',      value: 'RU, EN, AZ',  visible: true  },
-  { key: 'relationship', label: 'Статус',     value: 'Свободен',    visible: false },
-];
 const HOBBIES = ['Музыка','Кино','Спорт','Путешествия','Фото','Дизайн','Чтение','Кулинария','Танцы','Йога','Гейминг','Арт'];
 
-type Tab = 'posts' | 'gifts' | 'info' | 'settings';
+type Tab = 'posts' | 'gifts' | 'info';
 // Post type already defined above
 
 // ─── SVG icons ───────────────────────────────────────────────────────────────
 const GridIcon   = ({ c }: { c: string }) => <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Rect x="3" y="3" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="14" y="3" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="3" y="14" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/><Rect x="14" y="14" width="7" height="7" rx="1" stroke={c} strokeWidth="1.8"/></Svg>;
 const GiftIcon   = ({ c }: { c: string }) => <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Rect x="3" y="9" width="18" height="13" rx="2" stroke={c} strokeWidth="1.8"/><Path d="M12 9v13M3 13h18M8 9c0-2 1.8-4 4-4s4 2 4 4" stroke={c} strokeWidth="1.8" strokeLinecap="round"/></Svg>;
 const InfoIcon   = ({ c }: { c: string }) => <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Circle cx="12" cy="12" r="10" stroke={c} strokeWidth="1.8"/><Path d="M12 16v-4M12 8h.01" stroke={c} strokeWidth="2" strokeLinecap="round"/></Svg>;
-const CogIcon    = ({ c }: { c: string }) => <Svg width={20} height={20} viewBox="0 0 24 24" fill="none"><Circle cx="12" cy="12" r="3" stroke={c} strokeWidth="1.8"/><Path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke={c} strokeWidth="1.8"/></Svg>;
 const HeartIcon  = ({ filled }: { filled: boolean }) => <Svg width={22} height={22} viewBox="0 0 24 24" fill="none"><Path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78L12 21.23l7.78-7.78a5.5 5.5 0 000-7.78z" fill={filled ? '#F05A7E' : 'none'} stroke={filled ? '#F05A7E' : '#fff'} strokeWidth="2" strokeLinejoin="round"/></Svg>;
 
 function Row({ label, value, onToggle }: { label: string; value: boolean; onToggle: () => void }) {
@@ -138,15 +129,18 @@ const pv = StyleSheet.create({
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 export function ProfileScreen() {
-  const { user, avatarUri, logout, updateProfile } = useAuthStore();
+  const { user, avatarUri, updateProfile } = useAuthStore();
   const social = useSocialStore();
 
+  const fields = useProfileSettingsStore(s => s.fields);
+  const setFields = useProfileSettingsStore(s => s.setFields);
+  const showGifts = useProfileSettingsStore(s => s.showGifts);
+  const setShowGifts = useProfileSettingsStore(s => s.setShowGifts);
+  const showFavCount = useProfileSettingsStore(s => s.showFavCount);
+  const setShowFavCount = useProfileSettingsStore(s => s.setShowFavCount);
+
   // profile state
-  const [fields, setFields]             = useState<ProfileField[]>(DEFAULT_FIELDS);
   const [hobbies, setHobbies]           = useState(['Музыка', 'Путешествия', 'Кино']);
-  const [showGifts, setShowGifts]       = useState(true);
-  const [showFavCount, setShowFavCount] = useState(true);
-  const [hideOnline, setHideOnline]     = useState(false);
   const [activeTab, setActiveTab]       = useState<Tab>('posts');
   const [editField, setEditField]       = useState<ProfileField | null>(null);
   const [editValue, setEditValue]       = useState('');
@@ -279,10 +273,9 @@ export function ProfileScreen() {
 
   // ── FlatList: header component (scrolls with content) ──────────────────
   const TABS = [
-    { key: 'posts' as Tab,    label: 'Посты',  Icon: GridIcon },
-    { key: 'gifts' as Tab,    label: 'Дары',   Icon: GiftIcon },
-    { key: 'info' as Tab,     label: 'Инфо',   Icon: InfoIcon },
-    { key: 'settings' as Tab, label: 'Настр.', Icon: CogIcon  },
+    { key: 'posts' as Tab, label: 'Посты', Icon: GridIcon },
+    { key: 'gifts' as Tab, label: 'Дары',  Icon: GiftIcon },
+    { key: 'info' as Tab,  label: 'Инфо',  Icon: InfoIcon },
   ];
 
   const ListHeader = useMemo(() => (
@@ -349,7 +342,7 @@ export function ProfileScreen() {
       {/* ── Non-post tab bodies live here in the header ── */}
       {activeTab === 'gifts' && (
         <View style={ps.section}>
-          <Row label="Показывать подарки в профиле" value={showGifts} onToggle={() => setShowGifts(v=>!v)} />
+          <Row label="Показывать подарки в профиле" value={showGifts} onToggle={() => setShowGifts(!showGifts)} />
           {showGifts ? (
             <View style={ps.giftsGrid}>
               {MOCK_GIFTS.map(g => (
@@ -395,29 +388,6 @@ export function ProfileScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </View>
-      )}
-
-      {activeTab === 'settings' && (
-        <View style={ps.section}>
-          <Text style={ps.sectionTitle}>Конфиденциальность</Text>
-          <Row label="Показывать возраст"           value={fields.find(f=>f.key==='age')?.visible??true}        onToggle={()=>setFields(p=>p.map(f=>f.key==='age'?{...f,visible:!f.visible}:f))} />
-          <Row label="Показывать город"             value={fields.find(f=>f.key==='city')?.visible??true}       onToggle={()=>setFields(p=>p.map(f=>f.key==='city'?{...f,visible:!f.visible}:f))} />
-          <Row label="Показывать работу"            value={fields.find(f=>f.key==='occupation')?.visible??true} onToggle={()=>setFields(p=>p.map(f=>f.key==='occupation'?{...f,visible:!f.visible}:f))} />
-          <Row label="Показывать подарки"           value={showGifts}    onToggle={()=>setShowGifts(v=>!v)} />
-          <Row label="Показывать кол-во избранных" value={showFavCount} onToggle={()=>setShowFavCount(v=>!v)} />
-          <Row label="Скрыть статус «онлайн»"       value={hideOnline}   onToggle={()=>setHideOnline(v=>!v)} />
-          <Text style={[ps.sectionTitle,{marginTop:24}]}>Аккаунт</Text>
-          <View style={ps.idCard}>
-            <Text style={ps.idLabel}>Твой ID</Text>
-            <Text selectable style={ps.idVal}>{user?.id ?? '—'}</Text>
-          </View>
-          <TouchableOpacity style={ps.logoutBtn} onPress={()=>void logout()}>
-            <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-              <Path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke={colors.danger} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </Svg>
-            <Text style={ps.logoutTxt}>Выйти из аккаунта</Text>
-          </TouchableOpacity>
         </View>
       )}
 
@@ -585,11 +555,6 @@ const ps = StyleSheet.create({
   hobbyOptTxtActive: { color: colors.accent, fontWeight: '600' },
   settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: 1, borderColor: colors.border },
   settingLabel: { color: colors.text, fontSize: 15, flex: 1 },
-  idCard: { backgroundColor: colors.surface, borderRadius: radii.lg, padding: 14, marginBottom: 16, borderWidth: 1, borderColor: colors.border, marginTop: 8 },
-  idLabel: { color: colors.textMuted, fontSize: 12, marginBottom: 4 },
-  idVal: { color: colors.accent, fontSize: 13 },
-  logoutBtn: { borderRadius: radii.md, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 10, borderWidth: 1.5, borderColor: colors.danger },
-  logoutTxt: { color: colors.danger, fontWeight: '600', fontSize: 16 },
 
   // edit field modal
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.overlay },

@@ -8,7 +8,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Map: undefined;
-  Nearby: undefined;
+  Settings: undefined;
   Conversations: undefined;
   Gifts: undefined;
   Profile: undefined;
