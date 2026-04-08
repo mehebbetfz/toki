@@ -1,14 +1,25 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Path, Circle, Rect } from 'react-native-svg';
 import { colors } from '../theme';
+import { MapScreen } from '../screens/MapScreen';
 import { NearbyScreen } from '../screens/NearbyScreen';
+import { ConversationsScreen } from '../screens/ConversationsScreen';
 import { GiftsScreen } from '../screens/GiftsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function RadarTabIcon({ color }: { color: string }) {
+function MapIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 1118 0z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+      <Circle cx="12" cy="10" r="3" stroke={color} strokeWidth="1.8" />
+    </Svg>
+  );
+}
+
+function RadarIcon({ color }: { color: string }) {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" strokeDasharray="3 2" />
@@ -18,7 +29,15 @@ function RadarTabIcon({ color }: { color: string }) {
   );
 }
 
-function GiftTabIcon({ color }: { color: string }) {
+function ChatIcon({ color }: { color: string }) {
+  return (
+    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
+      <Path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke={color} strokeWidth="1.8" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+function GiftIcon({ color }: { color: string }) {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Rect x="3" y="9" width="18" height="13" rx="2" stroke={color} strokeWidth="1.8" />
@@ -27,7 +46,7 @@ function GiftTabIcon({ color }: { color: string }) {
   );
 }
 
-function ProfileTabIcon({ color }: { color: string }) {
+function ProfileIcon({ color }: { color: string }) {
   return (
     <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
       <Circle cx="12" cy="8" r="4" stroke={color} strokeWidth="1.8" />
@@ -46,36 +65,38 @@ export function TabNavigator() {
           borderTopColor: colors.border,
           borderTopWidth: 1,
           paddingBottom: 8,
-          height: 60,
+          paddingTop: 4,
+          height: 64,
         },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontSize: 12, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}
     >
       <Tab.Screen
+        name="Map"
+        component={MapScreen}
+        options={{ tabBarLabel: 'Карта', tabBarIcon: ({ color }) => <MapIcon color={color} /> }}
+      />
+      <Tab.Screen
         name="Nearby"
         component={NearbyScreen}
-        options={{
-          tabBarLabel: 'Рядом',
-          tabBarIcon: ({ color }) => <RadarTabIcon color={color} />,
-        }}
+        options={{ tabBarLabel: 'Рядом', tabBarIcon: ({ color }) => <RadarIcon color={color} /> }}
+      />
+      <Tab.Screen
+        name="Conversations"
+        component={ConversationsScreen}
+        options={{ tabBarLabel: 'Чаты', tabBarIcon: ({ color }) => <ChatIcon color={color} /> }}
       />
       <Tab.Screen
         name="Gifts"
         component={GiftsScreen}
-        options={{
-          tabBarLabel: 'Подарки',
-          tabBarIcon: ({ color }) => <GiftTabIcon color={color} />,
-        }}
+        options={{ tabBarLabel: 'Подарки', tabBarIcon: ({ color }) => <GiftIcon color={color} /> }}
       />
       <Tab.Screen
         name="Profile"
         component={ProfileScreen}
-        options={{
-          tabBarLabel: 'Профиль',
-          tabBarIcon: ({ color }) => <ProfileTabIcon color={color} />,
-        }}
+        options={{ tabBarLabel: 'Профиль', tabBarIcon: ({ color }) => <ProfileIcon color={color} /> }}
       />
     </Tab.Navigator>
   );
