@@ -194,8 +194,14 @@ export function ProfileScreen() {
   // ── Pin / unpin post ───────────────────────────────────────────────────
   const togglePin = useCallback((id: string) => {
     setUserPosts(prev => {
+      const target = prev.find(p => p.id === id);
+      if (!target) return prev;
+      // block pin if already 3 pinned and this post is not yet pinned
+      if (!target.pinned && prev.filter(p => p.pinned).length >= 3) {
+        Alert.alert('Лимит закрепов', 'Можно закрепить не более 3 постов.');
+        return prev;
+      }
       const updated = prev.map(p => p.id === id ? { ...p, pinned: !p.pinned } : p);
-      // pinned posts float to front
       return [...updated.filter(p => p.pinned), ...updated.filter(p => !p.pinned)];
     });
   }, []);
