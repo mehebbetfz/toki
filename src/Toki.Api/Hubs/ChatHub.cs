@@ -104,37 +104,71 @@ public sealed class ChatHub : Hub
     // ── Helpers ───────────────────────────────────────────────────────────────
     private async Task CheckSpamOrThrow(string userId)
     {
-        // 1. Check if currently blocked in DB
+        // 1. Load current spam state from DB
         var user = await _users.Find(u => u.Id == userId)
-                               .Project(u => new { u.SpamBlockedUntilUtc })
+                               .Project(u => new { u.SpamBlockedUntilUtc, u.SpamRequiresAdminUnlock, u.SpamOffenseCount })
                                .FirstOrDefaultAsync();
 
-        if (user?.SpamBlockedUntilUtc > DateTime.UtcNow)
+        if (user is null) return;
+
+        // Permanent lock — admin must unblock
+        if (user.SpamRequiresAdminUnlock)
+            throw new HubException("Ваш аккаунт заблокирован за систематический спам. Обратитесь в поддержку.");
+
+        // Active timed block
+        if (user.SpamBlockedUntilUtc > DateTime.UtcNow)
             throw new HubException($"Вы заблокированы за спам до {user.SpamBlockedUntilUtc:HH:mm dd.MM.yyyy} UTC.");
 
-        // 2. Sliding window counter
-        var now     = DateTime.UtcNow;
-        var cutoff  = now.AddSeconds(-SpamWindowSeconds);
-        var queue   = _msgTimestamps.GetOrAdd(userId, _ => new Queue<DateTime>());
+        // 2. Sliding window counter (in-memory)
+        var now    = DateTime.UtcNow;
+        var cutoff = now.AddSeconds(-SpamWindowSeconds);
+        var queue  = _msgTimestamps.GetOrAdd(userId, _ => new Queue<DateTime>());
 
+        bool triggered;
         lock (queue)
         {
             while (queue.Count > 0 && queue.Peek() < cutoff) queue.Dequeue();
             queue.Enqueue(now);
+            triggered = queue.Count > SpamMaxMessages;
+            if (triggered) queue.Clear();
+        }
 
-            if (queue.Count > SpamMaxMessages)
+        if (triggered)
+        {
+            // Escalate offense count and compute ban duration
+            var newOffenseCount = user.SpamOffenseCount + 1;
+            var requiresAdmin   = newOffenseCount >= 4;
+
+            DateTime? blockUntil = newOffenseCount switch
             {
-                // Block for 24 hours — fire-and-forget update
-                var until = DateTime.UtcNow.AddHours(24);
-                _ = _users.UpdateOneAsync(
-                    Builders<User>.Filter.Eq(u => u.Id, userId),
-                    Builders<User>.Update.Set(u => u.SpamBlockedUntilUtc, until));
+                1 => now.AddDays(3),
+                2 => now.AddDays(7),
+                3 => now.AddDays(30),
+                _ => null   // admin unlock required — set far future so active check triggers
+            };
 
-                queue.Clear();
-                throw new HubException($"Спам-блок активирован на 24 часа.");
-            }
+            var update = Builders<User>.Update
+                .Set(u => u.SpamOffenseCount, newOffenseCount)
+                .Set(u => u.SpamRequiresAdminUnlock, requiresAdmin)
+                .Set(u => u.SpamBlockedUntilUtc, requiresAdmin ? DateTime.UtcNow.AddYears(10) : blockUntil);
+
+            _ = _users.UpdateOneAsync(Builders<User>.Filter.Eq(u => u.Id, userId), update);
+
+            var msg = requiresAdmin
+                ? "Ваш аккаунт заблокирован навсегда — систематический спам. Обратитесь к администратору для разблокировки."
+                : $"Спам-блок #{newOffenseCount}: вы заблокированы на {BanLabel(newOffenseCount)}.";
+
+            throw new HubException(msg);
         }
     }
+
+    private static string BanLabel(int offense) => offense switch
+    {
+        1 => "3 дня",
+        2 => "7 дней",
+        3 => "30 дней",
+        _ => "неограниченный срок"
+    };
 
     /// <summary>Extracts recipient userId from conversationId format "userA_userB", pushes notification.</summary>
     private async Task PushNewMessageAsync(string conversationId, string senderUserId)

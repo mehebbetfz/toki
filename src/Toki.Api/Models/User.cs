@@ -30,6 +30,15 @@ public sealed class User
     /// <summary>Expo push token — registered by the mobile app on login.</summary>
     public string? ExpoPushToken { get; set; }
 
-    /// <summary>Unix timestamp of spam block expiry; null or in past = not blocked.</summary>
+    /// <summary>Spam block expiry; null or past = not blocked.</summary>
     public DateTime? SpamBlockedUntilUtc { get; set; }
+
+    /// <summary>
+    /// Escalating spam offense counter.
+    /// 1 → 3 days | 2 → 7 days | 3 → 30 days | 4+ → manual admin unlock required.
+    /// </summary>
+    public int SpamOffenseCount { get; set; }
+
+    /// <summary>When true the account requires admin approval to send messages again.</summary>
+    public bool SpamRequiresAdminUnlock { get; set; }
 }
