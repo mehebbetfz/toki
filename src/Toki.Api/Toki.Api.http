@@ -1,0 +1,6 @@
+@Toki.Api_HostAddress = http://localhost:5094
+
+GET {{Toki.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

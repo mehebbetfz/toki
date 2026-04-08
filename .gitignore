@@ -1,0 +1,22 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.pubxml
+*.PublishProfiles
+
+# Secrets — NEVER commit real secrets
+# appsettings.Production.json
+
+# Node / Expo
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/.metro-cache/
+
+# General
+.DS_Store
+Thumbs.db
+*.log
