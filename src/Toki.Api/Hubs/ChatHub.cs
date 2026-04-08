@@ -26,7 +26,7 @@ public sealed class ChatHub : Hub
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"conv:{conversationId}");
     }
 
-    /// <summary>Клиенты шлют уже зашифрованный полезный груз; сервер только ретранслирует и сохраняет.</summary>
+    /// <summary>E2E cipher message — сервер только ретранслирует и сохраняет.</summary>
     public async Task SendCipher(string conversationId, string ciphertextBase64, string? nonceBase64)
     {
         var userId = RequireUserId();
@@ -46,6 +46,41 @@ public sealed class ChatHub : Hub
             senderUserId = userId,
             ciphertextBase64,
             nonceBase64,
+            createdAtUtc = msg.CreatedAtUtc
+        });
+    }
+
+    /// <summary>Уведомление о наборе текста — клиент шлёт при каждом нажатии, throttle на стороне клиента.</summary>
+    public async Task SendTyping(string conversationId)
+    {
+        var userId = RequireUserId();
+        await Clients.OthersInGroup($"conv:{conversationId}").SendAsync("UserTyping", new
+        {
+            senderUserId = userId,
+            conversationId
+        });
+    }
+
+    /// <summary>Голосовое сообщение: base64-encoded аудио.</summary>
+    public async Task SendVoice(string conversationId, string audioBase64, int durationMs)
+    {
+        var userId = RequireUserId();
+        var msg = new ChatMessage
+        {
+            ConversationId = conversationId,
+            SenderUserId = userId,
+            CiphertextBase64 = audioBase64,
+            NonceBase64 = "voice",           // sentinel — клиент проверяет это поле
+            CreatedAtUtc = DateTime.UtcNow
+        };
+        await _messages.InsertOneAsync(msg);
+
+        await Clients.Group($"conv:{conversationId}").SendAsync("ReceiveVoice", new
+        {
+            messageId = msg.Id,
+            senderUserId = userId,
+            audioBase64,
+            durationMs,
             createdAtUtc = msg.CreatedAtUtc
         });
     }

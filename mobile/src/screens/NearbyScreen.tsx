@@ -16,6 +16,8 @@ import { getNearby, NearbyUser, setProximityState } from '../api/client';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../navigation/types';
+import { useSocialStore } from '../store/useSocialStore';
+import { MOCK_USERS } from '../mocks/mockUsers';
 
 function RadarIcon({ size = 24 }: { size?: number }) {
   return (
@@ -41,6 +43,7 @@ type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 export function NearbyScreen() {
   const nav = useNavigation<Nav>();
+  const social = useSocialStore();
   const [active, setActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<NearbyUser[]>([]);
@@ -113,44 +116,56 @@ export function NearbyScreen() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [active, fetchNearby]);
 
-  const renderUser = useCallback(({ item }: { item: NearbyUser }) => (
-    <View style={s.card}>
-      <View style={s.avatar}>
-        <PersonIcon size={28} />
+  // Merge API users with mock demo users
+  const allUsers: NearbyUser[] = active
+    ? [...users, ...MOCK_USERS.slice(0, 6).map(u => ({ id: u.id, displayName: u.displayName, distanceMeters: Math.floor(Math.random() * 90) + 10 }))]
+    : [];
+
+  const renderUser = useCallback(({ item }: { item: NearbyUser }) => {
+    const isFollowing = social.isFollowing(item.id);
+    return (
+      <View style={s.card}>
+        <View style={s.avatarWrap}>
+          <View style={[s.avatar, isFollowing && s.avatarFollowing]}>
+            <PersonIcon size={28} />
+          </View>
+          {isFollowing && (
+            <View style={s.followBadge}>
+              <Svg width={8} height={8} viewBox="0 0 24 24" fill="none">
+                <Path d="M20 6L9 17l-5-5" stroke="#fff" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </View>
+          )}
+        </View>
+        <View style={s.info}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={s.name}>{item.displayName}</Text>
+            {isFollowing && <View style={s.followTag}><Text style={s.followTagText}>подписка</Text></View>}
+          </View>
+          <Text style={s.tag}>Хочет общаться · {item.distanceMeters ?? '<100'} м</Text>
+        </View>
+        <View style={s.actions}>
+          <TouchableOpacity style={s.actionBtn} onPress={() => nav.navigate('Chat', { otherUserId: item.id, otherName: item.displayName })}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
+            </Svg>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, { marginLeft: 8 }]} onPress={() => nav.navigate('Call', { targetUserId: item.id, targetName: item.displayName, mode: 'audio' })}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 11.4a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
+            </Svg>
+          </TouchableOpacity>
+          <TouchableOpacity style={[s.actionBtn, { marginLeft: 8 }]} onPress={() => social.isFollowing(item.id) ? social.unfollow(item.id) : social.follow(item.id)}>
+            <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
+              {isFollowing
+                ? <Path d="M20 6L9 17l-5-5" stroke={colors.accent} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                : <><Path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2" stroke={colors.accent} strokeWidth="2" /><Circle cx="9" cy="7" r="4" stroke={colors.accent} strokeWidth="2" /><Path d="M19 8v6M22 11h-6" stroke={colors.accent} strokeWidth="2" strokeLinecap="round" /></>}
+            </Svg>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={s.info}>
-        <Text style={s.name}>{item.displayName}</Text>
-        <Text style={s.tag}>Хочет общаться · &lt;100 м</Text>
-      </View>
-      <View style={s.actions}>
-        <TouchableOpacity
-          style={s.actionBtn}
-          onPress={() => nav.navigate('Chat', { otherUserId: item.id, otherName: item.displayName })}
-        >
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
-          </Svg>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.actionBtn, { marginLeft: 8 }]}
-          onPress={() => nav.navigate('Call', { targetUserId: item.id, targetName: item.displayName, mode: 'audio' })}
-        >
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 11.4a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
-          </Svg>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[s.actionBtn, { marginLeft: 8 }]}
-          onPress={() => nav.navigate('Call', { targetUserId: item.id, targetName: item.displayName, mode: 'video' })}
-        >
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none">
-            <Path d="M23 7l-7 5 7 5V7z" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
-            <Rect x="1" y="5" width="15" height="14" rx="2" stroke={colors.accent} strokeWidth="2" strokeLinejoin="round" />
-          </Svg>
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [nav]);
+    );
+  }, [nav, social]);
 
   return (
     <SafeAreaView style={s.safe}>
@@ -192,7 +207,7 @@ export function NearbyScreen() {
       )}
 
       <FlatList
-        data={users}
+        data={allUsers}
         keyExtractor={(u) => u.id}
         renderItem={renderUser}
         contentContainerStyle={s.list}
@@ -233,14 +248,12 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  avatarWrap: { position: 'relative' },
+  avatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  avatarFollowing: { borderWidth: 2, borderColor: colors.accent },
+  followBadge: { position: 'absolute', top: -2, right: -2, width: 16, height: 16, borderRadius: 8, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', borderWidth: 1.5, borderColor: '#fff' },
+  followTag: { backgroundColor: colors.accentSoft, borderRadius: radii.pill, paddingHorizontal: 6, paddingVertical: 1 },
+  followTagText: { color: colors.accent, fontSize: 10, fontWeight: '700' },
   info: { flex: 1, marginLeft: 12 },
   name: { color: colors.text, fontSize: 16, fontWeight: '600' },
   tag: { color: colors.textMuted, fontSize: 12, marginTop: 2 },

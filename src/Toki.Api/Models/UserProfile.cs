@@ -22,5 +22,7 @@ public sealed class UserProfile
     public List<string> Hobbies { get; set; } = new();
     public List<ProfileField> Fields { get; set; } = new();
     public bool ShowGifts { get; set; } = true;
+    public bool ShowFavoriteCount { get; set; } = true;
+    public bool HideOnlineStatus { get; set; }
     public DateTime UpdatedAtUtc { get; set; } = DateTime.UtcNow;
 }

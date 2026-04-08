@@ -107,6 +107,15 @@ export async function getGifts(): Promise<Gift[]> {
   return r.json();
 }
 
+// ─── Convenience wrappers ──────────────────────────────────────────────────
+export async function setWantsToChat(wantsToChat: boolean) {
+  const r = await authFetch('/api/proximity/state', {
+    method: 'POST',
+    body: JSON.stringify({ latitude: 0, longitude: 0, wantsToChat }),
+  });
+  if (!r.ok) throw new Error(`setWantsToChat failed: ${r.status}`);
+}
+
 export async function orderGift(giftId: string, recipientUserId: string) {
   const r = await authFetch(`/api/gifts/${giftId}/order`, {
     method: 'POST',
@@ -126,7 +135,8 @@ export interface TokiUser {
 export interface NearbyUser {
   id: string;
   displayName: string;
-  wantsToChat: boolean;
+  wantsToChat?: boolean;
+  distanceMeters?: number;
 }
 
 export interface ChatMsg {

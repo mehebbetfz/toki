@@ -7,6 +7,7 @@ using Microsoft.OpenApi.Models;
 using MongoDB.Driver;
 using Toki.Api.Hubs;
 using Toki.Api.Infrastructure;
+using Toki.Api.Models;
 using Toki.Api.Options;
 using Toki.Api.Services;
 
@@ -32,6 +33,7 @@ builder.Services.AddSingleton<IMongoDatabase>(sp =>
 });
 
 builder.Services.AddHostedService<MongoIndexesHostedService>();
+builder.Services.AddHostedService<GiftSeedHostedService>();
 builder.Services.AddHostedService<DevUserSeedHostedService>();
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
 builder.Services.AddSingleton<IPasswordHasher<object>, PasswordHasher<object>>();

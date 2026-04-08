@@ -21,7 +21,7 @@ export function RootNavigator() {
       <Stack.Screen
         name="Chat"
         component={ChatScreen}
-        options={({ route }) => ({ title: route.params.otherName })}
+        options={({ route }) => ({ title: route.params.otherName, headerBackTitle: 'Назад' })}
       />
       <Stack.Screen
         name="Call"
